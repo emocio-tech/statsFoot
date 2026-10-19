@@ -1,0 +1,49 @@
+#!/bin/sh
+# Lance les tests du backend avant chaque commit ; le commit est annulé si un test échoue.
+# Activation (une fois par clone) : git config core.hooksPath .githooks
+# Contournement ponctuel : git commit --no-verify
+
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+# Trouve un JDK si JAVA_HOME n'est pas défini et que java n'est pas dans le PATH
+if [ -z "$JAVA_HOME" ] && ! command -v java >/dev/null 2>&1; then
+    for jdk in "$LOCALAPPDATA"/Programs/Eclipse\ Adoptium/jdk-* "$ProgramFiles"/Eclipse\ Adoptium/jdk-* "$ProgramFiles"/Java/jdk-*; do
+        if [ -x "$jdk/bin/java" ] || [ -x "$jdk/bin/java.exe" ]; then
+            JAVA_HOME="$jdk"
+        fi
+    done
+    if [ -z "$JAVA_HOME" ]; then
+        echo "pre-commit : aucun JDK trouvé, définissez JAVA_HOME." >&2
+        exit 1
+    fi
+    export JAVA_HOME
+fi
+
+case "$(uname -s)" in
+    MINGW* | MSYS* | CYGWIN*) MVNW="./mvnw.cmd" ;;
+    *) MVNW="./mvnw" ;;
+esac
+
+log="$(mktemp)"
+trap 'rm -f "$log"' EXIT
+
+echo "pre-commit : lancement des tests du backend..."
+if ! "$MVNW" -B -pl backend test >"$log" 2>&1; then
+    # Tests en échec, leur message, puis le résumé ; sinon (erreur de compilation...) la fin du log
+    if grep -q "<<< \(FAILURE\|ERROR\)!" "$log"; then
+        grep -A 4 -E "^\[ERROR\] [^ ]+ -- Time elapsed.*<<< (FAILURE|ERROR)!" "$log" | grep -v "^\s*at \|^--$" >&2
+        grep -E "^\[ERROR\] Tests run:" "$log" | tail -n 1 >&2
+    else
+        grep -E "^\[ERROR\]" "$log" | head -n 20 >&2
+    fi
+    echo "" >&2
+    echo "pre-commit : des tests échouent, commit annulé." >&2
+    echo "Rapports : backend/target/surefire-reports" >&2
+    exit 1
+fi
+
+summary="$(grep -E "^\[(INFO|WARNING)\] Tests run:" "$log" | tail -n 1)"
+echo "pre-commit : tests OK ${summary#*] }"
+if grep -q "Tests run:.*Skipped: [1-9]" "$log"; then
+    echo "pre-commit : attention, des tests ont été ignorés (base PostgreSQL de test indisponible ?)."
+fi

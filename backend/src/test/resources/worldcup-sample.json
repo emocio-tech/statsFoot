@@ -1,0 +1,53 @@
+worldcup-sample.son
+
+{"name": "Test Cup",
+ "matches": [
+  {"round": "First Stage, Group A",
+   "date": "2026-06-11",
+   "time": "13:00 UTC-6",
+   "team1": "Alpha",
+   "team2": "Beta",
+   "score": {"ft": [3, 1], "ht": [1, 0]},
+   "goals1": [
+     {"name": "A1", "minute": "10"},
+     {"name": "A1", "minute": "55", "penalty": true},
+     {"name": "A1", "minute": "90+2"}],
+   "goals2": [
+     {"name": "A2", "minute": "70", "owngoal": true}],
+   "ground": "Alpha Stadium, Alpha City",
+   "attendance": 50000,
+   "lineup": [
+     {"starter": [{"name": "A1", "captain": true}, {"name": "A2"}, {"name": "A3"}],
+      "bench": [{"name": "A4"}],
+      "subs": [{"on": "A4", "off": "A3", "minute": "60"}]},
+     {"starter": [{"name": "B1", "captain": true}, {"name": "B2"}, {"name": "B3"}],
+      "bench": [],
+      "subs": []}],
+   "bookings": [
+     [{"type": "Y", "name": "A2", "minute": "30"}],
+     [{"type": "R", "name": "B3", "minute": "20"},
+      {"type": "Y", "name": "B2", "minute": "40"},
+      {"type": "Y/R", "name": "B2", "minute": "80"}]],
+   "referees": [{"name": "Ref ONE", "country": "FRA"}]},
+  {"round": "Final",
+   "date": "2026-07-19",
+   "time": "9:30 UTC+5:30",
+   "team1": "Alpha",
+   "team2": "Gamma",
+   "score": {"p": [1, 0], "et": [1, 1], "ft": [0, 1], "ht": [0, 1]},
+   "goals1": [{"name": "A3", "minute": "120+1"}],
+   "goals2": [{"name": "G1", "minute": "30"}],
+   "ground": "Gamma Arena, Gamma City",
+   "attendance": 60000,
+   "lineup": [
+     {"starter": [{"name": "A1", "captain": true}, {"name": "A2"}, {"name": "A3"}],
+      "bench": [{"name": "A4"}],
+      "subs": []},
+     {"starter": [{"name": "G1", "captain": true}, {"name": "G2"}],
+      "bench": [{"name": "G3"}],
+      "subs": [{"on": "G3", "off": "G2", "minute": "121"}]}],
+   "referees": [{"name": "Ref ONE", "country": "FRA"}],
+   "penalties": [
+     {"name": "A1", "score": [1, 0]},
+     {"name": "G1", "note": "missed"}]}
+ ]}
