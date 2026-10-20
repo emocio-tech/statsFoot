@@ -7,6 +7,7 @@
 --   Partie 3  calcul des notes 0 à 10  (compute_ratings.sql du skill notation-matchs)
 --   Partie 4  statistiques détaillées par match (V3__tournament_stats.sql)
 --   Partie 5  vues des onglets "Joueurs" et "Équipes" (V3__tournament_stats.sql)
+--   Partie 6  stats détaillées FICTIVES (efface et régénère les tables de la partie 4)
 --
 -- Usage (psql) :
 --   psql -U analysefoot -h localhost -d <base> -v ON_ERROR_STOP=1 -f donneesStats.sql
@@ -574,5 +575,219 @@ GROUP BY m.competition_id, r.team_id, t.name;
 --   Onglet Équipes : SELECT * FROM v_team_tournament_stats
 --                    WHERE competition_id = :competition
 --                    ORDER BY rating DESC, points DESC, goals_for - goals_against DESC;
+
+
+-- =============================================================================
+-- PARTIE 6 : STATISTIQUES DÉTAILLÉES FICTIVES (en attendant une vraie source)
+-- =============================================================================
+-- ATTENTION : données INVENTÉES. Cette partie efface puis remplit player_match_stats
+-- et team_match_stats. Ne plus l'exécuter une fois des stats réelles importées.
+--
+-- Générées à partir des matchs réels, de façon déterministe : un même pseudo-aléa
+-- (md5 de la graine + identifiants) donne les mêmes valeurs à chaque exécution.
+-- Changer la graine dans pg_temp.rnd pour obtenir un autre tirage.
+--
+-- Règles de cohérence :
+--   - Tout est proportionnel au temps de jeu (une prolongation = x 4/3), 0 pour un
+--     joueur entré à la 120e. Les totaux d'équipe sont la somme de leurs joueurs.
+--   - Domination (0,32 à 0,68) tirée de l'écart de buts + aléa ; elle fait monter
+--     corners, hors-jeu et duels gagnés, et baisser les fautes.
+--   - Duels : les duels gagnés d'une équipe sont les duels perdus de l'adversaire.
+--   - Fautes : au moins une par carton reçu (jaune, deuxième jaune, rouge).
+--   - Coups francs concédés = fautes + hors-jeu (un hors-jeu donne un coup franc
+--     indirect) ; coups francs obtenus par l'équipe = coups francs concédés par
+--     l'adversaire. Pour un joueur, "obtenus" = fautes subies, réparties entre les
+--     joueurs à partir des fautes de l'adversaire. Les penaltys ne sont pas isolés.
+--   - Gardien (premier titulaire de la feuille de match, retrouvé sans la position
+--     qui n'est pas stockée) : environ 5 km, pas de corner ni de hors-jeu, très
+--     peu de fautes et de duels.
+--   - Hors-jeu surtout pour les buteurs du tournoi, corners concentrés sur quelques
+--     tireurs par équipe, distance propre à chaque joueur (9,6 à 11,6 km / 90 min).
+--   - Homme du match : meilleure note du match (puis buts, victoire, minutes).
+-- Les totaux entiers d'une équipe sont répartis entre ses joueurs au prorata d'un
+-- poids, au plus fort reste : la somme des joueurs tombe juste.
+
+-- Tirage pseudo-aléatoire dans [0, 1), stable pour des arguments donnés
+CREATE FUNCTION pg_temp.rnd(VARIADIC parts text[]) RETURNS double precision
+LANGUAGE sql IMMUTABLE AS $$
+    SELECT ('x' || substr(md5('fictif-v1|' || array_to_string(parts, '|')), 1, 8))::bit(32)::bigint / 4294967296.0
+$$;
+
+-- Gardien de chaque équipe à chaque match ---------------------------------------
+-- Le n°1 est le premier joueur créé de l'équipe (premier titulaire de son premier
+-- match). S'il ne joue pas, c'est un titulaire jamais aligné en même temps que lui.
+CREATE TEMP TABLE fs_goalkeeper ON COMMIT DROP AS
+WITH first_gk AS (
+    SELECT team_id, MIN(id) AS player_id FROM player GROUP BY team_id
+), starter AS (
+    SELECT match_id, team_id, player_id FROM match_lineup WHERE is_starter
+)
+SELECT s.match_id, s.team_id, s.player_id
+FROM starter s JOIN first_gk g ON g.player_id = s.player_id
+UNION ALL
+SELECT DISTINCT ON (s.match_id, s.team_id) s.match_id, s.team_id, s.player_id
+FROM starter s
+JOIN first_gk g ON g.team_id = s.team_id
+WHERE NOT EXISTS (SELECT 1 FROM starter x WHERE x.match_id = s.match_id AND x.player_id = g.player_id)
+  AND NOT EXISTS (SELECT 1 FROM starter a JOIN starter b ON b.match_id = a.match_id AND b.player_id = g.player_id
+                  WHERE a.player_id = s.player_id)
+ORDER BY 1, 2, 3;
+
+-- Équipes : domination et objectifs par match -------------------------------------
+-- Les tirages "de match" sont faits du point de vue de team1, puis inversés pour
+-- team2 : les deux équipes d'un match restent complémentaires.
+CREATE TEMP TABLE fs_team ON COMMIT DROP AS
+WITH side AS (
+    SELECT r.match_id, r.team_id, o.team_id AS opponent_id,
+           CASE WHEN m.team1_id = r.team_id THEN 1 ELSE -1 END AS sign,
+           r.goals_for - r.goals_against AS diff,
+           CASE WHEN m.et_team1 IS NULL THEN 1.0 ELSE 4.0 / 3 END AS f
+    FROM team_match_rating r
+    JOIN match m ON m.id = r.match_id
+    JOIN team_match_rating o ON o.match_id = r.match_id AND o.team_id <> r.team_id
+), shares AS (
+    SELECT s.*,
+           LEAST(0.68, GREATEST(0.32, 0.5 + 0.035 * s.diff
+                 + s.sign * 0.15 * (pg_temp.rnd(s.match_id::text, 'dom') - 0.5))) AS dom,
+           -- part des duels gagnés par team1, puis nombre total de duels du match
+           LEAST(0.6, GREATEST(0.4, 0.5 + 0.03 * s.diff * s.sign
+                 + 0.08 * (pg_temp.rnd(s.match_id::text, 'duels') - 0.5))) AS duel_share1,
+           ROUND(s.f * (170 + 50 * pg_temp.rnd(s.match_id::text, 'duels_n'))) AS duels_total
+    FROM side s
+)
+SELECT match_id, team_id, opponent_id, f, dom,
+       ROUND(f * (8 + 7 * pg_temp.rnd(match_id::text, team_id::text, 'fouls') + 10 * (0.5 - dom)))::int AS fouls,
+       ROUND(f * (1 + 9 * dom * pg_temp.rnd(match_id::text, team_id::text, 'corners')
+                  + 1.5 * pg_temp.rnd(match_id::text, team_id::text, 'corners2')))::int AS corners,
+       ROUND(f * 6 * dom * pg_temp.rnd(match_id::text, team_id::text, 'offsides'))::int AS offsides,
+       CASE WHEN sign = 1 THEN ROUND(duels_total * duel_share1)
+            ELSE duels_total - ROUND(duels_total * duel_share1) END::int AS duels_won,
+       CASE WHEN sign = 1 THEN duels_total - ROUND(duels_total * duel_share1)
+            ELSE ROUND(duels_total * duel_share1) END::int AS duels_lost
+FROM shares;
+
+-- Joueurs entrés en jeu -------------------------------------------------------------
+CREATE TEMP TABLE fs_player ON COMMIT DROP AS
+SELECT r.match_id, r.team_id, r.player_id, r.minutes_played AS minutes,
+       gk.player_id IS NOT NULL AS is_gk,
+       tg.goals AS tournament_goals,
+       (SELECT COUNT(*) FROM booking b WHERE b.match_id = r.match_id AND b.player_id = r.player_id) AS cards
+FROM player_match_rating r
+LEFT JOIN fs_goalkeeper gk ON gk.match_id = r.match_id AND gk.player_id = r.player_id
+JOIN (SELECT player_id, SUM(goals) AS goals FROM player_match_rating GROUP BY player_id) tg
+  ON tg.player_id = r.player_id;
+
+-- Poids de chaque joueur pour chaque stat (profil stable + temps de jeu)
+CREATE TEMP TABLE fs_weight ON COMMIT DROP AS
+SELECT fp.match_id, fp.team_id, fp.player_id, w.stat, fp.minutes * w.weight AS weight
+FROM fs_player fp
+CROSS JOIN LATERAL (VALUES
+    ('fouls',      CASE WHEN fp.is_gk THEN 0.08 ELSE 0.6 + 0.8 * pg_temp.rnd(fp.player_id::text, 'rugged') END),
+    ('duels_won',  CASE WHEN fp.is_gk THEN 0.1 ELSE (0.6 + 0.8 * pg_temp.rnd(fp.player_id::text, 'duelist'))
+                                                     * (0.8 + 0.4 * pg_temp.rnd(fp.player_id::text, 'strength')) END),
+    ('duels_lost', CASE WHEN fp.is_gk THEN 0.1 ELSE (0.6 + 0.8 * pg_temp.rnd(fp.player_id::text, 'duelist'))
+                                                     * (1.2 - 0.4 * pg_temp.rnd(fp.player_id::text, 'strength')) END),
+    ('corners',    CASE WHEN fp.is_gk THEN 0 ELSE power(pg_temp.rnd(fp.player_id::text, 'corner_taker'), 8) END),
+    ('offsides',   CASE WHEN fp.is_gk THEN 0 ELSE 0.15 + LEAST(fp.tournament_goals, 6)
+                                                   + 2 * power(pg_temp.rnd(fp.player_id::text, 'striker'), 4) END),
+    ('fouls_won',  CASE WHEN fp.is_gk THEN 0.05 ELSE 0.5 + 0.8 * pg_temp.rnd(fp.player_id::text, 'dribbler')
+                                                   + 0.2 * LEAST(fp.tournament_goals, 5) END)
+) AS w(stat, weight);
+
+-- Répartition des totaux d'équipe au plus fort reste
+CREATE TEMP TABLE fs_alloc (match_id INT, team_id INT, player_id INT, stat TEXT, value INT) ON COMMIT DROP;
+
+-- 1er passage : fautes, duels, corners, hors-jeu
+INSERT INTO fs_alloc
+WITH total AS (
+    SELECT match_id, team_id, v.stat, v.total
+    FROM fs_team
+    CROSS JOIN LATERAL (VALUES ('fouls', fouls), ('duels_won', duels_won), ('duels_lost', duels_lost),
+                               ('corners', corners), ('offsides', offsides)) AS v(stat, total)
+), share AS (
+    SELECT w.match_id, w.team_id, w.player_id, w.stat, t.total,
+           COALESCE(t.total * w.weight / NULLIF(SUM(w.weight) OVER (PARTITION BY w.match_id, w.team_id, w.stat), 0), 0) AS share
+    FROM fs_weight w JOIN total t ON t.match_id = w.match_id AND t.team_id = w.team_id AND t.stat = w.stat
+), base AS (
+    SELECT s.*, FLOOR(s.share)::int AS base,
+           ROW_NUMBER() OVER (PARTITION BY s.match_id, s.team_id, s.stat ORDER BY s.share - FLOOR(s.share) DESC, s.player_id) AS rk
+    FROM share s
+)
+SELECT match_id, team_id, player_id, stat,
+       base + CASE WHEN share > 0 AND rk <= total - SUM(base) OVER (PARTITION BY match_id, team_id, stat) THEN 1 ELSE 0 END
+FROM base;
+
+-- Au moins une faute par carton
+UPDATE fs_alloc a SET value = fp.cards
+FROM fs_player fp
+WHERE a.stat = 'fouls' AND fp.match_id = a.match_id AND fp.player_id = a.player_id AND a.value < fp.cards;
+
+-- 2e passage : fautes subies = fautes réellement commises par l'adversaire
+INSERT INTO fs_alloc
+WITH total AS (
+    SELECT t.match_id, t.team_id, 'fouls_won'::text AS stat, SUM(a.value)::int AS total
+    FROM fs_team t
+    JOIN fs_alloc a ON a.match_id = t.match_id AND a.team_id = t.opponent_id AND a.stat = 'fouls'
+    GROUP BY t.match_id, t.team_id
+), share AS (
+    SELECT w.match_id, w.team_id, w.player_id, w.stat, t.total,
+           COALESCE(t.total * w.weight / NULLIF(SUM(w.weight) OVER (PARTITION BY w.match_id, w.team_id), 0), 0) AS share
+    FROM fs_weight w JOIN total t ON t.match_id = w.match_id AND t.team_id = w.team_id AND t.stat = w.stat
+), base AS (
+    SELECT s.*, FLOOR(s.share)::int AS base,
+           ROW_NUMBER() OVER (PARTITION BY s.match_id, s.team_id ORDER BY s.share - FLOOR(s.share) DESC, s.player_id) AS rk
+    FROM share s
+)
+SELECT match_id, team_id, player_id, stat,
+       base + CASE WHEN share > 0 AND rk <= total - SUM(base) OVER (PARTITION BY match_id, team_id) THEN 1 ELSE 0 END
+FROM base;
+
+-- Écriture -----------------------------------------------------------------------
+DELETE FROM player_match_stats;
+DELETE FROM team_match_stats;
+
+INSERT INTO player_match_stats (match_id, player_id, team_id, fouls_committed, free_kicks_won, free_kicks_conceded,
+                                duels_won, duels_lost, corners, offsides, distance_km, is_man_of_the_match)
+SELECT fp.match_id, fp.player_id, fp.team_id,
+       a.fouls, a.fouls_won, a.fouls + a.offsides,
+       a.duels_won, a.duels_lost, a.corners, a.offsides,
+       ROUND((fp.minutes / 90.0 * CASE
+           WHEN fp.is_gk THEN 4.6 + 0.8 * pg_temp.rnd(fp.player_id::text, 'engine')
+           ELSE 9.6 + 2.0 * pg_temp.rnd(fp.player_id::text, 'engine')
+                + 0.6 * (pg_temp.rnd(fp.match_id::text, fp.player_id::text, 'km') - 0.5)
+       END)::numeric, 2),
+       fp.player_id = motm.player_id
+FROM fs_player fp
+JOIN (
+    SELECT match_id, player_id,
+           SUM(value) FILTER (WHERE stat = 'fouls')      AS fouls,
+           SUM(value) FILTER (WHERE stat = 'fouls_won')  AS fouls_won,
+           SUM(value) FILTER (WHERE stat = 'duels_won')  AS duels_won,
+           SUM(value) FILTER (WHERE stat = 'duels_lost') AS duels_lost,
+           SUM(value) FILTER (WHERE stat = 'corners')    AS corners,
+           SUM(value) FILTER (WHERE stat = 'offsides')   AS offsides
+    FROM fs_alloc GROUP BY match_id, player_id
+) a ON a.match_id = fp.match_id AND a.player_id = fp.player_id
+JOIN (
+    SELECT DISTINCT ON (r.match_id) r.match_id, r.player_id
+    FROM player_match_rating r
+    JOIN team_match_rating t ON t.match_id = r.match_id AND t.team_id = r.team_id
+    ORDER BY r.match_id, r.rating DESC, r.goals DESC, t.result = 'W' DESC, r.minutes_played DESC, r.player_id
+) motm ON motm.match_id = fp.match_id;
+
+INSERT INTO team_match_stats (match_id, team_id, fouls_committed, free_kicks_won, free_kicks_conceded,
+                              duels_won, duels_lost, corners, offsides, distance_km)
+SELECT s.match_id, s.team_id, s.fouls, o.fouls + o.offsides, s.fouls + s.offsides,
+       s.duels_won, s.duels_lost, s.corners, s.offsides, s.distance_km
+FROM (
+    SELECT match_id, team_id, SUM(fouls_committed) AS fouls, SUM(duels_won) AS duels_won, SUM(duels_lost) AS duels_lost,
+           SUM(corners) AS corners, SUM(offsides) AS offsides, SUM(distance_km) AS distance_km
+    FROM player_match_stats GROUP BY match_id, team_id
+) s
+JOIN fs_team t ON t.match_id = s.match_id AND t.team_id = s.team_id
+JOIN (
+    SELECT match_id, team_id, SUM(fouls_committed) AS fouls, SUM(offsides) AS offsides
+    FROM player_match_stats GROUP BY match_id, team_id
+) o ON o.match_id = s.match_id AND o.team_id = t.opponent_id;
 
 COMMIT;
