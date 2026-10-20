@@ -1,7 +1,8 @@
-package stats_foot.stats_foot.player;
+package stats_foot.stats_foot.player.repository;
 
 import java.util.List;
 import java.util.Optional;
+import stats_foot.stats_foot.player.model.Player;
 
 /** Port giving access to the players, whatever the underlying source. */
 public interface PlayerRepository {

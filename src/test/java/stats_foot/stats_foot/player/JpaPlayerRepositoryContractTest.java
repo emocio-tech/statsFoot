@@ -21,6 +21,17 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import jakarta.persistence.EntityManager;
+import stats_foot.stats_foot.player.dto.PlayerProfile;
+import stats_foot.stats_foot.player.dto.PlayerSearchResult;
+import stats_foot.stats_foot.player.dto.PlayerSummary;
+import stats_foot.stats_foot.player.entity.PlayerEntity;
+import stats_foot.stats_foot.player.entity.TeamEntity;
+import stats_foot.stats_foot.player.model.Player;
+import stats_foot.stats_foot.player.repository.JpaPlayerRepository;
+import stats_foot.stats_foot.player.repository.JsonPlayerRepository;
+import stats_foot.stats_foot.player.repository.PlayerJpaRepository;
+import stats_foot.stats_foot.player.repository.PlayerRepository;
+import stats_foot.stats_foot.player.service.PlayerService;
 
 /**
  * Runs the repository contract on the JPA adapter (H2 in memory) loaded from the real players, and checks

@@ -3,6 +3,7 @@ package stats_foot.stats_foot.player;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
+import stats_foot.stats_foot.player.util.NameNormalizer;
 
 class NameNormalizerTest {
 

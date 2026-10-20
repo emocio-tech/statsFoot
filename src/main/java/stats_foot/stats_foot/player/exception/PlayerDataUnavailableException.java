@@ -1,4 +1,4 @@
-package stats_foot.stats_foot.player;
+package stats_foot.stats_foot.player.exception;
 
 /** Raised when the player data cannot be read. The message never exposes a file path. */
 public class PlayerDataUnavailableException extends RuntimeException {

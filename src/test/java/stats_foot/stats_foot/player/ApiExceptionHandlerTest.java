@@ -14,6 +14,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import stats_foot.stats_foot.player.controller.PlayerController;
+import stats_foot.stats_foot.player.exception.InvalidSearchException;
+import stats_foot.stats_foot.player.exception.PlayerDataUnavailableException;
+import stats_foot.stats_foot.player.exception.PlayerNotFoundException;
+import stats_foot.stats_foot.player.service.PlayerService;
 
 @WebMvcTest(PlayerController.class)
 class ApiExceptionHandlerTest {

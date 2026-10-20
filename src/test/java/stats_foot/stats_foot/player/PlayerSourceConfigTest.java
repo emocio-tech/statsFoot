@@ -25,6 +25,12 @@ import jakarta.persistence.EntityManagerFactory;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
+import stats_foot.stats_foot.player.controller.PlayerController;
+import stats_foot.stats_foot.player.repository.JpaPlayerRepository;
+import stats_foot.stats_foot.player.repository.JsonPlayerRepository;
+import stats_foot.stats_foot.player.repository.PlayerJpaRepository;
+import stats_foot.stats_foot.player.repository.PlayerRepository;
+import stats_foot.stats_foot.player.service.PlayerService;
 
 /** Checks which player source is wired depending on the configuration. */
 class PlayerSourceConfigTest {

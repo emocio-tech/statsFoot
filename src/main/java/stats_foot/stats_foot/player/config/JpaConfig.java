@@ -1,9 +1,11 @@
-package stats_foot.stats_foot.player;
+package stats_foot.stats_foot.player.config;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.persistence.autoconfigure.EntityScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import stats_foot.stats_foot.player.entity.PlayerEntity;
+import stats_foot.stats_foot.player.repository.PlayerJpaRepository;
 
 /**
  * Registers the JPA entities and repositories only with {@code statsfoot.player-source=database}.

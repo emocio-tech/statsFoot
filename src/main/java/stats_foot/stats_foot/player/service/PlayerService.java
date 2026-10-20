@@ -1,4 +1,4 @@
-package stats_foot.stats_foot.player;
+package stats_foot.stats_foot.player.service;
 
 import java.time.Clock;
 import java.time.LocalDate;
@@ -7,14 +7,22 @@ import java.util.Comparator;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
+import stats_foot.stats_foot.player.dto.PlayerProfile;
+import stats_foot.stats_foot.player.dto.PlayerSearchResult;
+import stats_foot.stats_foot.player.dto.PlayerSummary;
+import stats_foot.stats_foot.player.exception.InvalidSearchException;
+import stats_foot.stats_foot.player.exception.PlayerNotFoundException;
+import stats_foot.stats_foot.player.model.Player;
+import stats_foot.stats_foot.player.repository.PlayerRepository;
+import stats_foot.stats_foot.player.util.NameNormalizer;
 
 /** Business logic of the player feature. */
 @Service
 public class PlayerService {
 
 	static final int MAX_RESULTS = 50;
-	static final String BLANK_QUERY_MESSAGE = "Please enter a player name.";
-	static final String NOT_FOUND_MESSAGE = "Player not found.";
+	public static final String BLANK_QUERY_MESSAGE = "Please enter a player name.";
+	public static final String NOT_FOUND_MESSAGE = "Player not found.";
 
 	private final PlayerRepository playerRepository;
 	private final Clock clock;

@@ -1,4 +1,4 @@
-package stats_foot.stats_foot.player;
+package stats_foot.stats_foot.player.entity;
 
 import java.time.LocalDate;
 
@@ -8,6 +8,10 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import stats_foot.stats_foot.player.model.GoalkeeperStats;
+import stats_foot.stats_foot.player.model.Player;
+import stats_foot.stats_foot.player.model.PlayerStats;
+import stats_foot.stats_foot.player.util.NameNormalizer;
 
 /**
  * Database row of a player (database adapter only). Statistic columns are nullable so that {@code null}

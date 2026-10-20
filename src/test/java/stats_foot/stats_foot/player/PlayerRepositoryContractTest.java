@@ -13,6 +13,11 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
+import stats_foot.stats_foot.player.model.GoalkeeperStats;
+import stats_foot.stats_foot.player.model.Player;
+import stats_foot.stats_foot.player.model.PlayerStats;
+import stats_foot.stats_foot.player.model.Team;
+import stats_foot.stats_foot.player.repository.PlayerRepository;
 
 /**
  * Contract every {@link PlayerRepository} adapter must satisfy. Expected values are read independently

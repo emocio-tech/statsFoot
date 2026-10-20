@@ -16,6 +16,10 @@ import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
+import stats_foot.stats_foot.player.exception.PlayerDataUnavailableException;
+import stats_foot.stats_foot.player.model.Player;
+import stats_foot.stats_foot.player.model.PlayerStats;
+import stats_foot.stats_foot.player.repository.JsonPlayerRepository;
 
 class JsonPlayerRepositoryTest {
 

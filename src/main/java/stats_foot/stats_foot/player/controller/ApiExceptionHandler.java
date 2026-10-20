@@ -1,4 +1,4 @@
-package stats_foot.stats_foot.player;
+package stats_foot.stats_foot.player.controller;
 
 import java.util.Map;
 
@@ -7,6 +7,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import stats_foot.stats_foot.player.exception.InvalidSearchException;
+import stats_foot.stats_foot.player.exception.PlayerDataUnavailableException;
+import stats_foot.stats_foot.player.exception.PlayerNotFoundException;
+import stats_foot.stats_foot.player.service.PlayerService;
 
 /** Maps the errors of the player feature to {@code {"error": "<English message>"}} bodies. */
 @RestControllerAdvice

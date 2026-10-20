@@ -1,4 +1,4 @@
-package stats_foot.stats_foot.player;
+package stats_foot.stats_foot.player.model;
 
 /** Tournament statistics of a player. A {@code null} value means "not available", distinct from {@code 0}. */
 public record PlayerStats(

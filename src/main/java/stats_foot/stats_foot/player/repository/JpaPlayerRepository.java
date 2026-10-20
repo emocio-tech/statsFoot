@@ -1,4 +1,4 @@
-package stats_foot.stats_foot.player;
+package stats_foot.stats_foot.player.repository;
 
 import java.util.List;
 import java.util.Optional;
@@ -6,6 +6,9 @@ import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Repository;
+import stats_foot.stats_foot.player.entity.PlayerEntity;
+import stats_foot.stats_foot.player.exception.PlayerDataUnavailableException;
+import stats_foot.stats_foot.player.model.Player;
 
 /**
  * Database adapter of {@link PlayerRepository}, active only with {@code statsfoot.player-source=database}.

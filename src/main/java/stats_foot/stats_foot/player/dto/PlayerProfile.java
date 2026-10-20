@@ -1,8 +1,10 @@
-package stats_foot.stats_foot.player;
+package stats_foot.stats_foot.player.dto;
 
 import java.time.LocalDate;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import stats_foot.stats_foot.player.model.GoalkeeperStats;
+import stats_foot.stats_foot.player.model.PlayerStats;
 
 /**
  * A player profile as exposed by the API. {@code goalkeeperStats} is {@code null} (and omitted from the JSON)

@@ -1,4 +1,4 @@
-package stats_foot.stats_foot.player;
+package stats_foot.stats_foot.player.repository;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -20,6 +20,11 @@ import org.springframework.stereotype.Repository;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
+import stats_foot.stats_foot.player.exception.PlayerDataUnavailableException;
+import stats_foot.stats_foot.player.model.GoalkeeperStats;
+import stats_foot.stats_foot.player.model.Player;
+import stats_foot.stats_foot.player.model.PlayerStats;
+import stats_foot.stats_foot.player.model.Team;
 
 /**
  * Reads {@code players.json} and {@code teams.json} once at construction and keeps the players in memory.

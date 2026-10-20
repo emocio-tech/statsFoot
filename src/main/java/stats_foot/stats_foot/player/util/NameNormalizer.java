@@ -1,4 +1,4 @@
-package stats_foot.stats_foot.player;
+package stats_foot.stats_foot.player.util;
 
 import java.text.Normalizer;
 import java.util.Locale;

@@ -1,9 +1,10 @@
-package stats_foot.stats_foot.player;
+package stats_foot.stats_foot.player.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import stats_foot.stats_foot.player.model.Team;
 
 /** Database row of a national team (database adapter only). */
 @Entity

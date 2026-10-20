@@ -18,6 +18,12 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
+import stats_foot.stats_foot.player.dto.PlayerProfile;
+import stats_foot.stats_foot.player.exception.PlayerNotFoundException;
+import stats_foot.stats_foot.player.model.GoalkeeperStats;
+import stats_foot.stats_foot.player.model.PlayerStats;
+import stats_foot.stats_foot.player.repository.JsonPlayerRepository;
+import stats_foot.stats_foot.player.service.PlayerService;
 
 class PlayerServiceProfileTest {
 
