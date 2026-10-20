@@ -1,0 +1,207 @@
+CADRAGE - ONGLET "ANALYSE" (statsFoot)
+=======================================
+
+Objet : permettre à l'utilisateur de poser une question dans une barre de recherche
+(meilleur buteur, équipe la moins fair-play...) et d'obtenir un rapport complet sur
+le joueur ou l'équipe concerné.
+
+Constat : sur les 8 questions demandées, 5 doivent être précisées avant développement.
+Une est impossible avec les données actuelles, une est contradictoire, et trois
+donnent des égalités ou presque aucun résultat.
+Les chiffres ci-dessous ont été vérifiés sur la base actuelle (worldcup-full.json,
+104 matchs).
+
+
+1. LES 8 QUESTIONS CONFRONTÉES AUX DONNÉES
+------------------------------------------
+
+1) Meilleur buteur
+   Critère demandé : le plus de buts.
+   Données         : Mbappé 10, Messi 8, Haaland 7.
+   Critère proposé : buts hors but contre son camp ; en cas d'égalité, celui qui
+                     a joué le moins de minutes.
+
+2) Meilleur passeur
+   Critère demandé : le plus de passes.
+   Données         : IMPOSSIBLE. worldcup-full.json ne contient ni passes ni
+                     passes décisives. Le README data/ de la branche init-project
+                     n'en mentionne pas non plus.
+   Proposition     : trouver une source qui contient les passes décisives ; en
+                     attendant, répondre "donnée non disponible".
+
+3) Joueur le plus agressif
+   Critère demandé : le plus de cartons jaunes.
+   Données         : 1 joueur à 3 jaunes, 31 joueurs à 2.
+   Critère proposé : conservé ; en cas d'égalité, le plus de jaunes par 90 minutes
+                     jouées.
+
+4) Joueur le moins fair-play
+   Critère demandé : le plus de cartons rouges.
+   Données         : 13 joueurs à égalité, avec 1 rouge chacun.
+   Critère proposé : points de fair-play FIFA par joueur (jaune -1, deuxième
+                     jaune -3, rouge direct -4) ; en cas d'égalité, le moins de
+                     minutes jouées.
+
+5) Meilleure équipe
+   Critère demandé : non défini.
+   Critère proposé : note moyenne calculée par le skill notation-matchs
+                     (Espagne 8,9). Alternative : le champion.
+
+6) Équipe qui a marqué le plus de buts
+   Critère demandé : le plus de buts.
+   Données         : France et Angleterre à égalité, 20 buts chacune.
+   Critère proposé : en cas d'égalité, la meilleure différence de buts, sinon
+                     les deux équipes ex aequo.
+
+7) Équipe la moins fair-play
+   Critère demandé : le plus de cartons Y/R (deuxième jaune).
+   Données         : seulement 2 cartons Y/R dans tout le tournoi (Argentine,
+                     Suisse).
+   Critère proposé : total des points de fair-play FIFA de l'équipe.
+
+8) Joueur le plus fair-play
+   Critère demandé : "le plus de cartons Y/R", avec un rapport sur l'équipe.
+   Données         : CONTRADICTOIRE. Le plus de cartons désigne le moins
+                     fair-play, et la question porte sur un joueur, pas sur une
+                     équipe.
+   Critère proposé : le joueur sans aucun carton qui a joué le plus de minutes
+                     (46 joueurs ont joué au moins 450 minutes sans carton).
+                     Rapport sur le joueur.
+
+
+2. ARCHITECTURE PROPOSÉE
+------------------------
+
+  Onglet Analyse (Angular)
+    barre de recherche + 8 suggestions cliquables
+          |  POST /api/analyse { question }
+          v
+  Backend Spring
+    1. Comprendre la question -> un des critères du catalogue   <- Tool (API Claude)
+    2. Classement SQL sur les vues statistiques                 <- v_player_stats / v_team_stats
+    3. Construction du rapport complet (joueur ou équipe)
+          |
+          v
+  { critère, explication, top 5 avec ex aequo, rapport }
+
+Principe : un seul catalogue des critères, défini côté backend. Le Tool, le serveur
+MCP, l'API et l'interface s'appuient tous dessus. Ajouter une question revient à
+ajouter une entrée au catalogue, avec sa requête SQL.
+
+
+3. RÔLE DE CHAQUE BRIQUE
+------------------------
+
+TOOL (tool use de l'API Claude, appelé par le backend)
+  - Un seul outil : rank(criterion, scope).
+      criterion : liste fermée (TOP_SCORER, MOST_YELLOW_CARDS, LEAST_FAIR_PLAY,
+                  BEST_TEAM...).
+      scope     : player ou team.
+  - Claude ne fait que traduire la question libre en critère. Il ne calcule rien :
+    les chiffres viennent toujours du SQL, donc il ne peut pas inventer de
+    statistiques.
+  - Modèle conseillé : Haiku (claude-haiku-5-5), suffisant pour reconnaître une
+    question parmi un catalogue fermé. La clé d'API reste côté serveur.
+  - Sans clé d'API : reconnaissance par mots-clés ("buteur", "jaune",
+    "fair-play"...). Les 8 suggestions cliquables fonctionnent toujours.
+
+MCP N°1 : "statsfoot" (métier, lecture seule)
+  - Expose à Claude Code et Claude Desktop les mêmes fonctions que l'API :
+    rank, player_report, team_report.
+  - Permet à l'équipe d'interroger les statistiques en langage naturel pendant le
+    développement, et de vérifier les rapports produits par l'onglet.
+
+MCP N°2 : PostgreSQL (développement, lecture seule)
+  - Serveur MCP PostgreSQL connecté avec un rôle en lecture seule, pour explorer
+    les données et mettre au point les requêtes des nouveaux critères.
+  - Jamais d'accès en écriture : le schéma reste géré par Flyway.
+
+SKILLS (Claude Code)
+  - ajout-critere-analyse : procédure de bout en bout pour ajouter une question :
+      définir le critère et sa règle d'égalité ;
+      ajouter l'entrée au catalogue et la requête SQL ;
+      mettre à jour la description de l'outil, ajouter la suggestion dans
+      l'interface et le test sur worldcup-sample.json.
+    Correspond à "Génération d'une logique BackEnd" dans la liste des skills
+    prévus par init-project.
+  - notation-matchs (existant) : fournit la note moyenne qui sert à désigner la
+    meilleure équipe et qui apparaît dans les rapports.
+  - rapport-analyse (optionnel) : produit un rapport rédigé, par exemple en
+    Markdown, à partir du MCP statsfoot, pour présenter les résultats.
+
+HOOKS
+  - Git pre-push : lancer les tests et le build Angular. Le hook de tests actuel
+    ne bloque que le commit, alors que init-project demande de bloquer aussi le
+    push.
+  - Claude Code PreToolUse : refuser toute modification d'une migration Flyway
+    déjà appliquée (V1, V2). Les changements de schéma passent par une nouvelle
+    migration.
+  - Test de cohérence (lancé par le hook de tests) : vérifier que chaque critère
+    du catalogue a bien sa requête SQL, sa description dans l'outil et son
+    libellé dans l'interface.
+
+
+4. DONNÉES ET API
+-----------------
+
+Migration V3 : vues v_player_stats et v_team_stats.
+  - Joueurs : buts, penalties, buts décisifs, minutes, jaunes, deuxièmes jaunes,
+    rouges, points de fair-play, note moyenne.
+  - Équipes : en plus, les points, la différence de buts et le dernier tour
+    atteint.
+  Ces vues sont la source unique pour l'API, l'outil et le MCP.
+
+Routes :
+  - POST /api/analyse                : répond à une question.
+  - GET  /api/players/{id}/report    : rapport joueur.
+  - GET  /api/teams/{id}/report      : rapport équipe.
+
+Rapport joueur :
+  - identité, équipe, matchs joués, minutes ;
+  - buts, penalties, buts décisifs, cartons, fair-play ;
+  - note moyenne, note de chaque match et meilleur match ;
+  - rang du joueur sur chaque critère.
+
+Rapport équipe :
+  - parcours match par match, avec scores et notes ;
+  - points, buts marqués et encaissés, fair-play, note moyenne ;
+  - effectif avec les statistiques de chaque joueur, meilleur buteur et meilleur
+    joueur selon la note.
+
+
+5. INTERFACE DE L'ONGLET ANALYSE
+--------------------------------
+
+  - Une barre de recherche, avec les 8 questions proposées en suggestions.
+  - Une réponse en titre, par exemple "Kylian Mbappé, 10 buts".
+  - Une ligne qui explique le critère appliqué, par exemple "Critère : buts hors
+    csc ; égalité départagée par les minutes jouées".
+  - Les éventuels ex aequo, affichés et non cachés.
+  - Le rapport complet en dessous, puis le top 5 pour situer le résultat.
+  - Une question non reconnue affiche les questions disponibles.
+    "Meilleur passeur" affiche "donnée non disponible".
+
+
+6. DÉCOUPAGE EN BRANCHES (convention d'init-project)
+----------------------------------------------------
+
+  1. fonc/analyse-vues-stats       (migration V3)
+  2. fonc/analyse-api
+  3. fonc/analyse-onglet
+  4. skill/ajout-critere-analyse
+  5. hook/pre-push-tests
+  6. MCP statsfoot, en dernier
+
+
+7. DÉCISIONS À PRENDRE AVANT DE COMMENCER
+-----------------------------------------
+
+  1. Meilleur passeur : chercher une source qui contient les passes décisives, ou
+     retirer la question pour l'instant ?
+  2. Quatre critères à valider : la définition de la meilleure équipe, les deux
+     critères de fair-play (points FIFA plutôt que nombre de rouges ou de Y/R) et
+     la règle pour le joueur le plus fair-play.
+  3. Appel à l'API Claude : l'accepter côté backend (clé d'API, coût, données
+     envoyées) ou s'en tenir aux mots-clés et aux suggestions ?
+  4. Branche de départ : initDonneesNotation (PostgreSQL, données actuelles) ou
+     init-project (Spring Boot 4, fichiers JSON dans data/) ?
