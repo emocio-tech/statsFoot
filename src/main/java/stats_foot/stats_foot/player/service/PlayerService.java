@@ -1,18 +1,17 @@
 package stats_foot.stats_foot.player.service;
 
-import java.time.Clock;
-import java.time.LocalDate;
-import java.time.Period;
 import java.util.Comparator;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
 import stats_foot.stats_foot.player.dto.PlayerProfile;
+import stats_foot.stats_foot.player.dto.PlayerProfile.PlayerProfileStats;
 import stats_foot.stats_foot.player.dto.PlayerSearchResult;
 import stats_foot.stats_foot.player.dto.PlayerSummary;
 import stats_foot.stats_foot.player.exception.InvalidSearchException;
 import stats_foot.stats_foot.player.exception.PlayerNotFoundException;
 import stats_foot.stats_foot.player.model.Player;
+import stats_foot.stats_foot.player.model.PlayerStats;
 import stats_foot.stats_foot.player.repository.PlayerRepository;
 import stats_foot.stats_foot.player.util.NameNormalizer;
 
@@ -25,11 +24,9 @@ public class PlayerService {
 	public static final String NOT_FOUND_MESSAGE = "Player not found.";
 
 	private final PlayerRepository playerRepository;
-	private final Clock clock;
 
-	public PlayerService(PlayerRepository playerRepository, Clock clock) {
+	public PlayerService(PlayerRepository playerRepository) {
 		this.playerRepository = playerRepository;
-		this.clock = clock;
 	}
 
 	/**
@@ -55,25 +52,25 @@ public class PlayerService {
 	}
 
 	/**
-	 * Builds the profile of a player, with the age in full years computed on the date of the injected clock.
+	 * Builds the profile of a player.
 	 *
-	 * @throws PlayerNotFoundException if the id is null, blank or unknown
+	 * @throws PlayerNotFoundException if the id is unknown
 	 */
-	public PlayerProfile getProfile(String id) {
-		if (id == null || id.isBlank()) {
-			throw new PlayerNotFoundException(NOT_FOUND_MESSAGE);
-		}
+	public PlayerProfile getProfile(int id) {
 		Player player = playerRepository.findById(id).orElseThrow(() -> new PlayerNotFoundException(NOT_FOUND_MESSAGE));
-		int age = Period.between(player.birthDate(), LocalDate.now(clock)).getYears();
 		return new PlayerProfile(player.id(), player.name(), player.team().code(), player.team().name(),
-				player.shirtNumber(), player.position(), player.positionDetail(), player.birthDate(), age,
-				player.club(), player.heightCm(), player.preferredFoot(), player.captain(), player.stats(),
-				player.goalkeeperStats());
+				player.goalkeeperMatches(), player.captainMatches(), toProfileStats(player.stats()));
 	}
 
 	private static PlayerSummary toSummary(Player player) {
-		return new PlayerSummary(player.id(), player.name(), player.team().code(), player.team().name(),
-				player.position());
+		return new PlayerSummary(player.id(), player.name(), player.team().code(), player.team().name());
+	}
+
+	private static PlayerProfileStats toProfileStats(PlayerStats s) {
+		return new PlayerProfileStats(s.matchesPlayed(), s.matchesStarted(), s.minutesPlayed(), s.goals(),
+				s.penaltyGoals(), s.ownGoals(), s.yellowCards(), s.redCards(), s.foulsCommitted(), s.freeKicksWon(),
+				s.freeKicksConceded(), s.duelsWon(), s.duelsLost(), s.corners(), s.offsides(), s.distanceKm(),
+				s.manOfTheMatchCount(), s.rating(), s.ratingWeighted());
 	}
 
 }

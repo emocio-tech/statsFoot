@@ -1,29 +1,38 @@
 package stats_foot.stats_foot.player.dto;
 
-import java.time.LocalDate;
-
-import com.fasterxml.jackson.annotation.JsonInclude;
-import stats_foot.stats_foot.player.model.GoalkeeperStats;
-import stats_foot.stats_foot.player.model.PlayerStats;
-
 /**
- * A player profile as exposed by the API. {@code goalkeeperStats} is {@code null} (and omitted from the JSON)
- * for outfield players; statistics keep {@code null} when not available.
+ * A player profile as exposed by the API. Totals keep {@code null} (kept in the JSON) when not available.
  */
 public record PlayerProfile(
-		String id,
+		int id,
 		String name,
 		String teamCode,
 		String teamName,
-		Integer shirtNumber,
-		String position,
-		String positionDetail,
-		LocalDate birthDate,
-		int age,
-		String club,
-		Integer heightCm,
-		String preferredFoot,
-		Boolean captain,
-		PlayerStats stats,
-		@JsonInclude(JsonInclude.Include.NON_NULL) GoalkeeperStats goalkeeperStats) {
+		int goalkeeperMatches,
+		int captainMatches,
+		PlayerProfileStats stats) {
+
+	/** Tournament totals of the player. */
+	public record PlayerProfileStats(
+			Integer matchesPlayed,
+			Integer matchesStarted,
+			Integer minutesPlayed,
+			Integer goals,
+			Integer penaltyGoals,
+			Integer ownGoals,
+			Integer yellowCards,
+			Integer redCards,
+			Integer foulsCommitted,
+			Integer freeKicksWon,
+			Integer freeKicksConceded,
+			Integer duelsWon,
+			Integer duelsLost,
+			Integer corners,
+			Integer offsides,
+			Double distanceKm,
+			Integer manOfTheMatchCount,
+			Double rating,
+			Double ratingWeighted) {
+	}
+
 }

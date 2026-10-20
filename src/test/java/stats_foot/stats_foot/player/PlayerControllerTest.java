@@ -6,94 +6,99 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneOffset;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
+import stats_foot.stats_foot.TestDataFile;
+import stats_foot.stats_foot.TestDataFile.FilePlayer;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
+/** HTTP contract of the player API on the real application (in-memory database imported from the real file). */
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import(PlayerControllerTest.FixedClockConfig.class)
 class PlayerControllerTest {
 
-	@TestConfiguration
-	static class FixedClockConfig {
+	private static final String BLANK_BODY = "{\"error\":\"Please enter a player name.\"}";
+	private static final String NOT_FOUND_BODY = "{\"error\":\"Player not found.\"}";
 
-		@Bean
-		@Primary
-		Clock fixedClock() {
-			return Clock.fixed(Instant.parse("2026-10-20T10:00:00Z"), ZoneOffset.UTC);
-		}
+	private static final List<String> REMOVED_FIELDS = List.of("shirtNumber", "position", "positionDetail",
+			"birthDate", "age", "club", "heightCm", "preferredFoot", "captain", "goalkeeperStats", "passAccuracy");
 
+	/** Contract field (camelCase) to field of the "tournament" block of the file. */
+	private static final Map<String, String> STAT_FIELDS = new LinkedHashMap<>();
+
+	static {
+		STAT_FIELDS.put("matchesPlayed", "matches_played");
+		STAT_FIELDS.put("matchesStarted", "matches_started");
+		STAT_FIELDS.put("minutesPlayed", "minutes_played");
+		STAT_FIELDS.put("goals", "goals");
+		STAT_FIELDS.put("penaltyGoals", "penalty_goals");
+		STAT_FIELDS.put("ownGoals", "own_goals");
+		STAT_FIELDS.put("yellowCards", "yellow_cards");
+		STAT_FIELDS.put("redCards", "red_cards");
+		STAT_FIELDS.put("foulsCommitted", "fouls_committed");
+		STAT_FIELDS.put("freeKicksWon", "free_kicks_won");
+		STAT_FIELDS.put("freeKicksConceded", "free_kicks_conceded");
+		STAT_FIELDS.put("duelsWon", "duels_won");
+		STAT_FIELDS.put("duelsLost", "duels_lost");
+		STAT_FIELDS.put("corners", "corners");
+		STAT_FIELDS.put("offsides", "offsides");
+		STAT_FIELDS.put("distanceKm", "distance_km");
+		STAT_FIELDS.put("manOfTheMatchCount", "man_of_the_match_count");
+		STAT_FIELDS.put("rating", "rating");
+		STAT_FIELDS.put("ratingWeighted", "rating_weighted");
 	}
-
-	private static final String BLANK_MESSAGE = "Please enter a player name.";
-
-	private static Map<String, JsonNode> jsonById;
 
 	@Autowired
 	private MockMvc mockMvc;
 
-	@DynamicPropertySource
-	static void dataDir(DynamicPropertyRegistry registry) {
-		registry.add("statsfoot.data-dir", () -> TestDataFiles.dataDir().toString());
-	}
-
-	@BeforeAll
-	static void readJson() throws IOException {
-		JsonMapper mapper = JsonMapper.builder().build();
-		jsonById = new HashMap<>();
-		for (JsonNode node : mapper.readTree(Files.readAllBytes(TestDataFiles.playersFile()))) {
-			jsonById.put(node.get("id").asString(), node);
-		}
+	/** The expected profile JSON, built from the file with the field names of the contract. */
+	private static String expectedProfileJson(int id) {
+		FilePlayer player = TestDataFile.player(id);
+		Map<String, Object> stats = new LinkedHashMap<>();
+		STAT_FIELDS.forEach((field, column) -> stats.put(field, player.tournament().get(column)));
+		Map<String, Object> profile = new LinkedHashMap<>();
+		profile.put("id", player.id());
+		profile.put("name", player.name());
+		profile.put("teamCode", player.teamCode());
+		profile.put("teamName", player.teamName());
+		profile.put("goalkeeperMatches", player.node().get("goalkeeperMatches"));
+		profile.put("captainMatches", player.node().get("captainMatches"));
+		profile.put("stats", stats);
+		return JsonMapper.builder().build().writeValueAsString(profile);
 	}
 
 	@Test
-	void exactNameGivesOneSummary() throws Exception {
-		JsonNode json = jsonById.get("P-0001");
-		mockMvc.perform(get("/api/players").param("name", "sami suzuki"))
+	void rangelSearchHasNoPosition() throws Exception {
+		mockMvc.perform(get("/api/players").param("name", "rangel"))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.total").value(1))
-				.andExpect(jsonPath("$.truncated").value(false))
-				.andExpect(jsonPath("$.players.length()").value(1))
-				.andExpect(jsonPath("$.players[0].id").value("P-0001"))
-				.andExpect(jsonPath("$.players[0].name").value("Sami Suzuki"))
-				.andExpect(jsonPath("$.players[0].teamCode").value(json.get("teamId").asString()))
-				.andExpect(jsonPath("$.players[0].teamName").isNotEmpty())
-				.andExpect(jsonPath("$.players[0].position").value(json.get("position").asString()));
+				.andExpect(content().json(
+						"{\"total\":1,\"truncated\":false,\"players\":[{\"id\":1,\"name\":\"Raul RANGEL\","
+								+ "\"teamCode\":\"MEX\",\"teamName\":\"Mexico\"}]}",
+						true));
 	}
 
 	@Test
-	void suzGivesSixteen() throws Exception {
-		mockMvc.perform(get("/api/players").param("name", "suz"))
+	void searchResultsHaveNoPositionKey() throws Exception {
+		String body = mockMvc.perform(get("/api/players").param("name", "so"))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.total").value(16))
-				.andExpect(jsonPath("$.truncated").value(false))
-				.andExpect(jsonPath("$.players.length()").value(16));
+				.andReturn().getResponse().getContentAsString();
+		assertThat(body).doesNotContain("position");
 	}
 
 	@Test
-	void exactlyFiftyIsNotTruncated() throws Exception {
-		mockMvc.perform(get("/api/players").param("name", "ou"))
+	void soIsNotTruncated() throws Exception {
+		mockMvc.perform(get("/api/players").param("name", "so"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.total").value(50))
 				.andExpect(jsonPath("$.truncated").value(false))
@@ -101,8 +106,8 @@ class PlayerControllerTest {
 	}
 
 	@Test
-	void fiftyOneIsTruncated() throws Exception {
-		mockMvc.perform(get("/api/players").param("name", "id"))
+	void teIsTruncated() throws Exception {
+		mockMvc.perform(get("/api/players").param("name", "te"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.total").value(51))
 				.andExpect(jsonPath("$.truncated").value(true))
@@ -113,7 +118,7 @@ class PlayerControllerTest {
 	void manyMatchesAreCappedAtFifty() throws Exception {
 		mockMvc.perform(get("/api/players").param("name", "a"))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.total").value(1130))
+				.andExpect(jsonPath("$.total").value(913))
 				.andExpect(jsonPath("$.truncated").value(true))
 				.andExpect(jsonPath("$.players.length()").value(50));
 	}
@@ -122,88 +127,72 @@ class PlayerControllerTest {
 	void noMatchGivesEmptyList() throws Exception {
 		mockMvc.perform(get("/api/players").param("name", "xyzxyz"))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.total").value(0))
-				.andExpect(jsonPath("$.truncated").value(false))
-				.andExpect(jsonPath("$.players.length()").value(0));
+				.andExpect(content().json("{\"total\":0,\"truncated\":false,\"players\":[]}", true));
 	}
 
-	@Test
-	void accentedQueryFindsSamiSuzuki() throws Exception {
-		mockMvc.perform(get("/api/players?name={name}", "sámi"))
-				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.players[?(@.name == 'Sami Suzuki')]").isNotEmpty());
-	}
-
-	@Test
-	void emptyNameIsRejected() throws Exception {
-		mockMvc.perform(get("/api/players?name="))
+	@ParameterizedTest
+	@ValueSource(strings = { "", "  " })
+	void blankNameIsRejected(String name) throws Exception {
+		mockMvc.perform(get("/api/players").param("name", name))
 				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.error").value(BLANK_MESSAGE));
-	}
-
-	@Test
-	void spacesOnlyNameIsRejected() throws Exception {
-		mockMvc.perform(get("/api/players?name={name}", "  "))
-				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.error").value(BLANK_MESSAGE));
+				.andExpect(content().json(BLANK_BODY, true));
 	}
 
 	@Test
 	void missingNameIsRejected() throws Exception {
 		mockMvc.perform(get("/api/players"))
 				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.error").value(BLANK_MESSAGE));
+				.andExpect(content().json(BLANK_BODY, true));
 	}
 
 	@Test
-	void goalkeeperProfileHasAgeNullPassAccuracyAndGoalkeeperStats() throws Exception {
-		String body = mockMvc.perform(get("/api/players/P-0001"))
+	void profileOfRangelIsTheExactContract() throws Exception {
+		mockMvc.perform(get("/api/players/1"))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.id").value("P-0001"))
-				.andExpect(jsonPath("$.name").value("Sami Suzuki"))
-				.andExpect(jsonPath("$.birthDate").value("2006-11-03"))
-				.andExpect(jsonPath("$.age").value(19))
-				.andExpect(jsonPath("$.stats.goals").value(0))
-				.andExpect(jsonPath("$.goalkeeperStats.saves").value(0))
+				.andExpect(content().contentTypeCompatibleWith("application/json"))
+				.andExpect(content().json(expectedProfileJson(1), true))
+				.andExpect(jsonPath("$.goalkeeperMatches").value(5))
+				.andExpect(jsonPath("$.stats.goals").value(0));
+	}
+
+	@Test
+	void profileHasNoRemovedField() throws Exception {
+		String body = mockMvc.perform(get("/api/players/1"))
+				.andExpect(status().isOk())
 				.andReturn().getResponse().getContentAsString();
-		assertThat(body).contains("\"passAccuracy\":null");
+		JsonNode json = JsonMapper.builder().build().readTree(body);
+		for (String field : REMOVED_FIELDS) {
+			assertThat(json.has(field)).as(field).isFalse();
+			assertThat(json.get("stats").has(field)).as("stats." + field).isFalse();
+			assertThat(body).doesNotContain("\"" + field + "\"");
+		}
 	}
 
 	@Test
-	void profileMatchesTheJson() throws Exception {
-		JsonNode json = jsonById.get("P-0003");
-		mockMvc.perform(get("/api/players/P-0003"))
+	void nullIsKeptInTheJson() throws Exception {
+		String body = mockMvc.perform(get("/api/players/316"))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.name").value(json.get("name").asString()))
-				.andExpect(jsonPath("$.teamCode").value(json.get("teamId").asString()))
-				.andExpect(jsonPath("$.shirtNumber").value(json.get("shirtNumber").asInt()))
-				.andExpect(jsonPath("$.club").value(json.get("club").asString()))
-				.andExpect(jsonPath("$.stats.passes").value(json.get("stats").get("passes").asInt()))
-				.andExpect(jsonPath("$.stats.passAccuracy").value(json.get("stats").get("passAccuracy").asDouble()));
-	}
-
-	@Test
-	void captainIsReported() throws Exception {
-		mockMvc.perform(get("/api/players/P-0005"))
-				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.captain").value(true));
-	}
-
-	@Test
-	void outfieldPlayerHasNoGoalkeeperStatsKey() throws Exception {
-		String body = mockMvc.perform(get("/api/players/P-0020"))
-				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.id").value("P-0020"))
+				.andExpect(content().json(expectedProfileJson(316), true))
+				.andExpect(jsonPath("$.stats.minutesPlayed").value(0))
 				.andReturn().getResponse().getContentAsString();
-		assertThat(body).doesNotContain("goalkeeperStats");
+		assertThat(body).contains("\"ratingWeighted\":null");
 	}
 
 	@Test
-	void unknownIdIsNotFound() throws Exception {
-		mockMvc.perform(get("/api/players/P-9999"))
+	void captainMatchesAreReported() throws Exception {
+		mockMvc.perform(get("/api/players/2"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.captainMatches").value(3))
+				.andExpect(jsonPath("$.goalkeeperMatches").value(0));
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "999999", "abc", "P-0001" })
+	void unknownOrNonNumericIdIsNotFound(String id) throws Exception {
+		mockMvc.perform(get("/api/players/{id}", id))
 				.andExpect(status().isNotFound())
 				.andExpect(content().contentTypeCompatibleWith("application/json"))
-				.andExpect(jsonPath("$.error").value("Player not found."));
+				.andExpect(content().json(NOT_FOUND_BODY, true));
 	}
 
 }

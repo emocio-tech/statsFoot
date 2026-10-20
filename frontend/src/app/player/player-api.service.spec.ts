@@ -7,29 +7,22 @@ import { PlayerProfile, PlayerSearchResult } from './player.models';
 const SEARCH_RESULT: PlayerSearchResult = {
   total: 1,
   truncated: false,
-  players: [{ id: 'P-0001', name: 'Sami Suzuki', teamCode: 'ESP', teamName: 'Spain', position: 'GK' }],
+  players: [{ id: 1, name: 'Raul RANGEL', teamCode: 'MEX', teamName: 'Mexico' }],
 };
 
 const PROFILE: PlayerProfile = {
-  id: 'P-0001',
-  name: 'Sami Suzuki',
-  teamCode: 'ESP',
-  teamName: 'Spain',
-  shirtNumber: 1,
-  position: 'GK',
-  positionDetail: 'GK',
-  birthDate: '2006-11-03',
-  age: 19,
-  club: 'Club América',
-  heightCm: 190,
-  preferredFoot: 'right',
-  captain: false,
+  id: 1,
+  name: 'Raul RANGEL',
+  teamCode: 'MEX',
+  teamName: 'Mexico',
+  goalkeeperMatches: 5,
+  captainMatches: 0,
   stats: {
-    appearances: 0, starts: 0, minutesPlayed: 0, goals: 0, assists: 0, ownGoals: 0,
-    shots: 0, shotsOnTarget: 0, yellowCards: 0, redCards: 0,
-    foulsCommitted: 0, foulsSuffered: 0, passes: 0, passAccuracy: null,
+    matchesPlayed: 5, matchesStarted: 5, minutesPlayed: 438, goals: 0, penaltyGoals: 0, ownGoals: 0,
+    yellowCards: 0, redCards: 0, foulsCommitted: 0, freeKicksWon: 0, freeKicksConceded: 0,
+    duelsWon: 5, duelsLost: 5, corners: 0, offsides: 0, distanceKm: 25.11, manOfTheMatchCount: 0,
+    rating: 6.9, ratingWeighted: null,
   },
-  goalkeeperStats: { saves: 0, goalsConceded: 0, cleanSheets: 0, penaltiesSaved: 0 },
 };
 
 describe('PlayerApiService', () => {
@@ -59,21 +52,16 @@ describe('PlayerApiService', () => {
     expect(result).toEqual(SEARCH_RESULT);
   });
 
-  it('should call GET /api/players/P-0001 for the profile', () => {
+  it('should call GET /api/players/1 for the profile', () => {
     let result: PlayerProfile | undefined;
-    service.getProfile('P-0001').subscribe((r) => (result = r));
+    service.getProfile(1).subscribe((r) => (result = r));
 
-    const req = http.expectOne('/api/players/P-0001');
+    const req = http.expectOne('/api/players/1');
     expect(req.request.method).toBe('GET');
     req.flush(PROFILE);
 
     expect(result).toEqual(PROFILE);
-    expect(result?.stats.passAccuracy).toBeNull();
-  });
-
-  it('should encode the id in the profile URL', () => {
-    service.getProfile('P/0001 x').subscribe();
-    http.expectOne('/api/players/P%2F0001%20x').flush(PROFILE);
+    expect(result?.stats.ratingWeighted).toBeNull();
   });
 
   const errorCases: [number, string][] = [
@@ -93,8 +81,8 @@ describe('PlayerApiService', () => {
 
     it(`should propagate a ${status} error from getProfile`, () => {
       let error: { status: number; error: { error: string } } | undefined;
-      service.getProfile('P-0001').subscribe({ error: (e) => (error = e) });
-      http.expectOne('/api/players/P-0001').flush({ error: message }, { status, statusText: 'Error' });
+      service.getProfile(1).subscribe({ error: (e) => (error = e) });
+      http.expectOne('/api/players/1').flush({ error: message }, { status, statusText: 'Error' });
       expect(error?.status).toBe(status);
       expect(error?.error).toEqual({ error: message });
     });

@@ -45,7 +45,7 @@ export class PlayerSearchPage {
     });
   }
 
-  openProfile(id: string): void {
+  openProfile(id: number): void {
     this.request?.unsubscribe();
     this.profile.set(null);
     this.request = this.api.getProfile(id).subscribe({

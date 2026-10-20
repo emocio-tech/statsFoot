@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import stats_foot.stats_foot.player.exception.InvalidSearchException;
 import stats_foot.stats_foot.player.exception.PlayerDataUnavailableException;
 import stats_foot.stats_foot.player.exception.PlayerNotFoundException;
@@ -21,8 +22,8 @@ public class ApiExceptionHandler {
 		return error(HttpStatus.BAD_REQUEST, PlayerService.BLANK_QUERY_MESSAGE);
 	}
 
-	@ExceptionHandler(PlayerNotFoundException.class)
-	public ResponseEntity<Map<String, String>> handleNotFound(PlayerNotFoundException e) {
+	@ExceptionHandler({ PlayerNotFoundException.class, MethodArgumentTypeMismatchException.class })
+	public ResponseEntity<Map<String, String>> handleNotFound(Exception e) {
 		return error(HttpStatus.NOT_FOUND, PlayerService.NOT_FOUND_MESSAGE);
 	}
 

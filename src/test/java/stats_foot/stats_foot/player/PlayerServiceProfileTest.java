@@ -2,144 +2,97 @@ package stats_foot.stats_foot.player;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneOffset;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Arrays;
+import java.util.List;
 
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.json.JsonMapper;
+import stats_foot.stats_foot.TestDataFile;
+import stats_foot.stats_foot.TestDataFile.FilePlayer;
 import stats_foot.stats_foot.player.dto.PlayerProfile;
+import stats_foot.stats_foot.player.dto.PlayerProfile.PlayerProfileStats;
 import stats_foot.stats_foot.player.exception.PlayerNotFoundException;
-import stats_foot.stats_foot.player.model.GoalkeeperStats;
-import stats_foot.stats_foot.player.model.PlayerStats;
-import stats_foot.stats_foot.player.repository.JsonPlayerRepository;
 import stats_foot.stats_foot.player.service.PlayerService;
+import tools.jackson.databind.JsonNode;
 
+/** Profile of the service on the real repository (in-memory database imported from the real file). */
+@SpringBootTest
+@AutoConfigureMockMvc
 class PlayerServiceProfileTest {
 
-	private static final String[] STAT_KEYS = { "appearances", "starts", "minutesPlayed", "goals", "assists", "ownGoals",
-			"shots", "shotsOnTarget", "yellowCards", "redCards", "foulsCommitted", "foulsSuffered", "passes",
-			"passAccuracy" };
+	private static final List<String> REMOVED_FIELDS = List.of("shirtNumber", "position", "positionDetail",
+			"birthDate", "age", "club", "heightCm", "preferredFoot", "captain", "goalkeeperStats", "passAccuracy");
 
-	private static Map<String, JsonNode> jsonById;
-	private static Map<String, String> teamNames;
-	private static JsonPlayerRepository repository;
-
-	@BeforeAll
-	static void setUp() throws IOException {
-		JsonMapper mapper = JsonMapper.builder().build();
-		jsonById = new HashMap<>();
-		for (JsonNode node : mapper.readTree(Files.readAllBytes(TestDataFiles.playersFile()))) {
-			jsonById.put(node.get("id").asString(), node);
-		}
-		teamNames = new HashMap<>();
-		for (JsonNode node : mapper.readTree(Files.readAllBytes(TestDataFiles.teamsFile()))) {
-			teamNames.put(node.get("id").asString(), node.get("name").asString());
-		}
-		repository = new JsonPlayerRepository(TestDataFiles.dataDir().toString());
-	}
-
-	private static PlayerService serviceAt(String date) {
-		Clock clock = Clock.fixed(Instant.parse(date + "T12:00:00Z"), ZoneOffset.UTC);
-		return new PlayerService(repository, clock);
-	}
-
-	private static Object statValue(PlayerStats stats, String key) {
-		return switch (key) {
-			case "appearances" -> stats.appearances();
-			case "starts" -> stats.starts();
-			case "minutesPlayed" -> stats.minutesPlayed();
-			case "goals" -> stats.goals();
-			case "assists" -> stats.assists();
-			case "ownGoals" -> stats.ownGoals();
-			case "shots" -> stats.shots();
-			case "shotsOnTarget" -> stats.shotsOnTarget();
-			case "yellowCards" -> stats.yellowCards();
-			case "redCards" -> stats.redCards();
-			case "foulsCommitted" -> stats.foulsCommitted();
-			case "foulsSuffered" -> stats.foulsSuffered();
-			case "passes" -> stats.passes();
-			case "passAccuracy" -> stats.passAccuracy();
-			default -> throw new IllegalArgumentException(key);
-		};
-	}
-
-	@Test
-	void ageIsNineteenBeforeBirthdayOfP0001() {
-		assertThat(serviceAt("2026-10-20").getProfile("P-0001").age()).isEqualTo(19);
-		assertThat(serviceAt("2026-11-02").getProfile("P-0001").age()).isEqualTo(19);
-	}
-
-	@Test
-	void ageIsTwentyOnBirthdayOfP0001() {
-		assertThat(serviceAt("2026-11-03").getProfile("P-0001").age()).isEqualTo(20);
-	}
+	@Autowired
+	private PlayerService service;
 
 	@ParameterizedTest
-	@ValueSource(strings = { "P-0003", "P-0005" })
-	void identityAndStatsEqualTheJson(String id) {
-		JsonNode json = jsonById.get(id);
-		PlayerProfile profile = serviceAt("2026-10-20").getProfile(id);
+	@ValueSource(ints = { 1, 2, 316 })
+	void identityAndTotalsEqualTheFile(int id) {
+		FilePlayer expected = TestDataFile.player(id);
+		JsonNode t = expected.tournament();
+		PlayerProfile profile = service.getProfile(id);
 		assertThat(profile.id()).isEqualTo(id);
-		assertThat(profile.name()).isEqualTo(json.get("name").asString());
-		assertThat(profile.teamCode()).isEqualTo(json.get("teamId").asString());
-		assertThat(profile.teamName()).isEqualTo(teamNames.get(json.get("teamId").asString()));
-		assertThat(profile.shirtNumber()).isEqualTo(json.get("shirtNumber").asInt());
-		assertThat(profile.position()).isEqualTo(json.get("position").asString());
-		assertThat(profile.positionDetail()).isEqualTo(json.get("positionDetail").asString());
-		assertThat(profile.birthDate()).hasToString(json.get("birthDate").asString());
-		assertThat(profile.club()).isEqualTo(json.get("club").asString());
-		assertThat(profile.heightCm()).isEqualTo(json.get("heightCm").asInt());
-		assertThat(profile.preferredFoot()).isEqualTo(json.get("preferredFoot").asString());
-		assertThat(profile.captain()).isEqualTo(json.get("captain").asBoolean());
-		JsonNode stats = json.get("stats");
-		for (String key : STAT_KEYS) {
-			Object expected = stats.get(key).isNull() ? null
-					: key.equals("passAccuracy") ? (Object) stats.get(key).asDouble() : (Object) stats.get(key).asInt();
-			assertThat(statValue(profile.stats(), key)).as(key).isEqualTo(expected);
+		assertThat(profile.name()).isEqualTo(expected.name());
+		assertThat(profile.teamCode()).isEqualTo(expected.teamCode());
+		assertThat(profile.teamName()).isEqualTo(expected.teamName());
+		assertThat(profile.goalkeeperMatches()).isEqualTo(expected.node().get("goalkeeperMatches").asInt());
+		assertThat(profile.captainMatches()).isEqualTo(expected.node().get("captainMatches").asInt());
+		PlayerProfileStats s = profile.stats();
+		assertThat(s.matchesPlayed()).isEqualTo(TestDataFile.intOrNull(t, "matches_played"));
+		assertThat(s.matchesStarted()).isEqualTo(TestDataFile.intOrNull(t, "matches_started"));
+		assertThat(s.minutesPlayed()).isEqualTo(TestDataFile.intOrNull(t, "minutes_played"));
+		assertThat(s.goals()).isEqualTo(TestDataFile.intOrNull(t, "goals"));
+		assertThat(s.penaltyGoals()).isEqualTo(TestDataFile.intOrNull(t, "penalty_goals"));
+		assertThat(s.ownGoals()).isEqualTo(TestDataFile.intOrNull(t, "own_goals"));
+		assertThat(s.yellowCards()).isEqualTo(TestDataFile.intOrNull(t, "yellow_cards"));
+		assertThat(s.redCards()).isEqualTo(TestDataFile.intOrNull(t, "red_cards"));
+		assertThat(s.foulsCommitted()).isEqualTo(TestDataFile.intOrNull(t, "fouls_committed"));
+		assertThat(s.freeKicksWon()).isEqualTo(TestDataFile.intOrNull(t, "free_kicks_won"));
+		assertThat(s.freeKicksConceded()).isEqualTo(TestDataFile.intOrNull(t, "free_kicks_conceded"));
+		assertThat(s.duelsWon()).isEqualTo(TestDataFile.intOrNull(t, "duels_won"));
+		assertThat(s.duelsLost()).isEqualTo(TestDataFile.intOrNull(t, "duels_lost"));
+		assertThat(s.corners()).isEqualTo(TestDataFile.intOrNull(t, "corners"));
+		assertThat(s.offsides()).isEqualTo(TestDataFile.intOrNull(t, "offsides"));
+		assertThat(s.manOfTheMatchCount()).isEqualTo(TestDataFile.intOrNull(t, "man_of_the_match_count"));
+		assertThat(s.distanceKm()).isCloseTo(TestDataFile.doubleOrNull(t, "distance_km"), within(0.01));
+		assertThat(s.rating()).isCloseTo(TestDataFile.doubleOrNull(t, "rating"), within(0.01));
+		Double weighted = TestDataFile.doubleOrNull(t, "rating_weighted");
+		if (weighted == null) {
+			assertThat(s.ratingWeighted()).isNull();
+		} else {
+			assertThat(s.ratingWeighted()).isCloseTo(weighted, within(0.01));
 		}
 	}
 
 	@Test
-	void passAccuracyIsNullForP0001AndNotNullForP0003() {
-		assertThat(serviceAt("2026-10-20").getProfile("P-0001").stats().passAccuracy()).isNull();
-		assertThat(serviceAt("2026-10-20").getProfile("P-0003").stats().passAccuracy()).isNotNull();
+	void zeroStaysZeroAndNullStaysNull() {
+		assertThat(service.getProfile(1).stats().goals()).isEqualTo(0);
+		assertThat(service.getProfile(316).stats().ratingWeighted()).isNull();
 	}
 
 	@Test
-	void zeroStatisticStaysZero() {
-		PlayerStats stats = serviceAt("2026-10-20").getProfile("P-0001").stats();
-		assertThat(stats.goals()).isEqualTo(0);
-		assertThat(stats.passes()).isEqualTo(0);
+	void profileHasNoRemovedField() {
+		List<String> components = Arrays.stream(PlayerProfile.class.getRecordComponents())
+				.map(c -> c.getName()).toList();
+		assertThat(components).containsExactly("id", "name", "teamCode", "teamName", "goalkeeperMatches",
+				"captainMatches", "stats");
+		assertThat(components).doesNotContainAnyElementsOf(REMOVED_FIELDS);
+		List<String> statComponents = Arrays.stream(PlayerProfileStats.class.getRecordComponents())
+				.map(c -> c.getName()).toList();
+		assertThat(statComponents).hasSize(19).doesNotContainAnyElementsOf(REMOVED_FIELDS);
 	}
 
 	@Test
-	void goalkeeperStatsArePresentForGoalkeeperAndAbsentForOutfieldPlayer() {
-		PlayerService service = serviceAt("2026-10-20");
-		JsonNode expected = jsonById.get("P-0001").get("goalkeeperStats");
-		GoalkeeperStats stats = service.getProfile("P-0001").goalkeeperStats();
-		assertThat(stats).isNotNull();
-		assertThat(stats.saves()).isEqualTo(expected.get("saves").asInt());
-		assertThat(stats.goalsConceded()).isEqualTo(expected.get("goalsConceded").asInt());
-		assertThat(stats.cleanSheets()).isEqualTo(expected.get("cleanSheets").asInt());
-		assertThat(stats.penaltiesSaved()).isEqualTo(expected.get("penaltiesSaved").asInt());
-		assertThat(service.getProfile("P-0020").goalkeeperStats()).isNull();
-	}
-
-	@ParameterizedTest
-	@ValueSource(strings = { "P-9999", "", "   ", "\t" })
-	void unknownOrBlankIdIsNotFound(String id) {
-		assertThatThrownBy(() -> serviceAt("2026-10-20").getProfile(id))
+	void unknownIdIsNotFound() {
+		assertThatThrownBy(() -> service.getProfile(999999))
 				.isInstanceOf(PlayerNotFoundException.class)
 				.hasMessage("Player not found.");
 	}
