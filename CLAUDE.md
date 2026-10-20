@@ -78,6 +78,10 @@ Avant de pousser du code sur `main`, faire un merge ou un rebase de `main` en am
 - Génération d'une logique BackEnd
 - Un ou plusieurs skills de Spec Driven Development (voir ci-dessous)
 
+### sdd
+
+Skill de Spec Driven Development (`.claude/skills/sdd/`). La spec est la source de vérité : il produit `specs/<feature>/spec.md` (quoi / pourquoi), `plan.md` (comment) puis `tasks.md` (tâches vérifiables), avec une validation humaine bloquante après chacun, avant d'implémenter puis de vérifier la conformité du code à la spec. Les fichiers de `specs/` sont rédigés en anglais. Il délègue aux agents `explorateur`, `analyse-impact`, `redacteur-plan-test`, `implementeur` et `relecteur`.
+
 ### feature-orchestrator
 
 Skill d'orchestration d'une feature de bout en bout (discussion, exploration, plan, validation humaine, implémentation, revue, doc, commit). Il délègue aux agents `explorateur`, `analyse-impact`, `redacteur-plan-test`, `implementeur`, `relecteur` et `relecteur-doc`, avec deux validations humaines bloquantes (avant l'implémentation et avant le commit).
