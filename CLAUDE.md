@@ -21,24 +21,26 @@
 
 ## Commandes
 
-Les dossiers `backend/` et `frontend/` sont ceux prévus pour la cible (ils n'existent pas encore).
+Le BackEnd (Maven) est à la **racine** du dépôt (`pom.xml`, `mvnw`, `src/`) ; le FrontEnd Angular est dans `frontend/`.
 
 ### BackEnd (Maven)
 
 Le BackEnd utilise Maven avec le wrapper (`mvnw` + `pom.xml`) : ne pas dépendre d'un Maven installé sur le poste.
 
 ```
-cd backend
-./mvnw spring-boot:run   # lancer l'application
+./mvnw spring-boot:run   # lancer l'application (http://localhost:8080)
 ./mvnw test              # lancer les tests
 ```
+
+Les tests et l'application lisent `data/players.json` et `data/teams.json` (voir « Pièges connus »).
 
 ### FrontEnd (Node)
 
 ```
 cd frontend
 npm install              # installer les dépendances (première fois)
-npm start                # lancer l'application Angular
+npm start                # lancer l'application Angular (http://localhost:4200, proxy /api vers :8080)
+npm test                 # lancer les tests (non interactif)
 ```
 
 ## Architecture
@@ -54,6 +56,10 @@ npm start                # lancer l'application Angular
   - classes et interfaces en `PascalCase`, méthodes et variables en `camelCase`, constantes en `UPPER_SNAKE_CASE`, packages en minuscules ;
 
 ## Pièges connus
+
+- **Fichiers JSON de `data/` non versionnés sur `main` ni sur les branches de feature** : ils vivent sur la branche `data`. Pour lancer l'application ou les tests BackEnd en local, les extraire sans les indexer :
+  `git archive origin/data data/players.json data/teams.json | tar -x`, puis les exclure localement dans `.git/info/exclude` (`/data/*.json`). Sans ces fichiers, les tests de données échouent avec le message « data files missing ».
+- **Source de données** : `statsfoot.player-source=json` par défaut ; la source base de données (`database`) existe mais n'est pas utilisée (à activer avec le profil Spring `database`, qui positionne `player-source=database`, et une datasource `spring.datasource.*` fournie au déploiement).
 
 ## Git
 

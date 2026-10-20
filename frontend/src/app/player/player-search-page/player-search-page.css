@@ -1,0 +1,14 @@
+.page { max-width: 48rem; margin: 0 auto; padding: 1rem; font-family: system-ui, sans-serif; color: #101828; }
+.search { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 1rem; }
+.search label { flex-basis: 100%; font-weight: 600; }
+.search input { flex: 1 1 14rem; padding: 0.5rem; border: 1px solid #98a2b3; border-radius: 6px; font-size: 1rem; }
+.search button { padding: 0.5rem 1.25rem; border: 0; border-radius: 6px; background: #1d4ed8; color: #fff; font-size: 1rem; cursor: pointer; }
+.message { padding: 0.75rem 1rem; border-radius: 6px; background: #fff4e5; border: 1px solid #f5b971; }
+.results { list-style: none; margin: 0 0 1rem; padding: 0; border: 1px solid #d0d5dd; border-radius: 8px; }
+.results li + li { border-top: 1px solid #eaecf0; }
+.row { display: grid; grid-template-columns: 2fr 2fr 1fr; gap: 0.5rem; width: 100%; padding: 0.6rem 0.9rem; border: 0; background: #fff; text-align: left; font-size: 1rem; cursor: pointer; }
+.row:hover, .row:focus-visible { background: #eff4ff; }
+.player-name { font-weight: 600; }
+@media (max-width: 30rem) {
+  .row { grid-template-columns: 1fr; }
+}
