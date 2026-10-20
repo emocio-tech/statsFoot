@@ -5,12 +5,15 @@
 --   Partie 1  schéma des compétitions  (V1__init_schema.sql)
 --   Partie 2  tables de notes          (V2__match_ratings.sql)
 --   Partie 3  calcul des notes 0 à 10  (compute_ratings.sql du skill notation-matchs)
+--   Partie 4  statistiques détaillées par match (V3__tournament_stats.sql)
+--   Partie 5  vues des onglets "Joueurs" et "Équipes" (V3__tournament_stats.sql)
 --
 -- Usage (psql) :
 --   psql -U analysefoot -h localhost -d <base> -v ON_ERROR_STOP=1 -f donneesStats.sql
 --
--- Les parties 1 et 2 créent les tables absentes. Elles ne modifient pas une table
+-- Les parties 1, 2 et 4 créent les tables absentes. Elles ne modifient pas une table
 -- existante. La partie 3 efface et recalcule toutes les notes à chaque exécution.
+-- La partie 5 (re)crée les vues ; elle ne stocke rien.
 --
 -- Dans l'application, le schéma reste géré par Flyway (backend/src/main/resources/db/migration).
 -- Ce fichier en est une copie de lecture et sert aussi de script autonome. Il ne doit
@@ -388,5 +391,188 @@ CROSS JOIN LATERAL (
     SELECT COALESCE(SUM(CASE b.card WHEN 'Y' THEN -1 WHEN 'Y/R' THEN -2 WHEN 'R' THEN -4 END), 0) AS points
     FROM booking b WHERE b.match_id = tr.match_id AND b.team_id = tr.team_id
 ) fp;
+
+--COMMIT;
+
+
+-- =============================================================================
+-- PARTIE 4 : STATISTIQUES DÉTAILLÉES PAR MATCH (absentes de worldcup-full.json)
+-- =============================================================================
+-- Fautes, coups francs, duels, corners, hors-jeu, distance et homme du match ne
+-- figurent pas dans le format openfootball. Ces tables les accueillent, à remplir
+-- par un import complémentaire (feuilles de stats officielles, fournisseur de données).
+--
+-- Convention : NULL = donnée inconnue, 0 = valeur mesurée nulle. Les vues de la
+-- partie 5 gardent cette distinction : un total reste NULL tant qu'aucun match du
+-- joueur ou de l'équipe n'a la donnée.
+--
+-- Coups francs : "obtenus" = fautes subies, "concédés" = fautes sifflées contre
+-- le joueur ou l'équipe et sanctionnées d'un coup franc.
+
+CREATE TABLE IF NOT EXISTS player_match_stats (
+    match_id              INT NOT NULL REFERENCES match(id) ON DELETE CASCADE,
+    player_id             INT NOT NULL REFERENCES player(id),
+    team_id               INT NOT NULL REFERENCES team(id),
+    fouls_committed       SMALLINT CHECK (fouls_committed >= 0),
+    free_kicks_won        SMALLINT CHECK (free_kicks_won >= 0),
+    free_kicks_conceded   SMALLINT CHECK (free_kicks_conceded >= 0),
+    duels_won             SMALLINT CHECK (duels_won >= 0),
+    duels_lost            SMALLINT CHECK (duels_lost >= 0),
+    corners               SMALLINT CHECK (corners >= 0),            -- corners tirés
+    offsides              SMALLINT CHECK (offsides >= 0),
+    distance_km           NUMERIC(5, 2) CHECK (distance_km >= 0),
+    is_man_of_the_match   BOOLEAN NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (match_id, player_id)
+);
+
+-- Un seul homme du match par rencontre
+CREATE UNIQUE INDEX IF NOT EXISTS uq_player_stats_motm
+    ON player_match_stats(match_id) WHERE is_man_of_the_match;
+CREATE INDEX IF NOT EXISTS idx_player_stats_player ON player_match_stats(player_id);
+
+-- Totaux d'équipe tels que publiés. Facultatifs : à défaut, la partie 5 additionne
+-- les lignes joueurs du match (les corners et hors-jeu sont souvent publiés
+-- seulement au niveau de l'équipe).
+CREATE TABLE IF NOT EXISTS team_match_stats (
+    match_id              INT NOT NULL REFERENCES match(id) ON DELETE CASCADE,
+    team_id               INT NOT NULL REFERENCES team(id),
+    fouls_committed       SMALLINT CHECK (fouls_committed >= 0),
+    free_kicks_won        SMALLINT CHECK (free_kicks_won >= 0),
+    free_kicks_conceded   SMALLINT CHECK (free_kicks_conceded >= 0),
+    duels_won             SMALLINT CHECK (duels_won >= 0),
+    duels_lost            SMALLINT CHECK (duels_lost >= 0),
+    corners               SMALLINT CHECK (corners >= 0),
+    offsides              SMALLINT CHECK (offsides >= 0),
+    distance_km           NUMERIC(6, 2) CHECK (distance_km >= 0),
+    PRIMARY KEY (match_id, team_id)
+);
+
+
+-- =============================================================================
+-- PARTIE 5 : VUES DU TOURNOI (onglets "Joueurs" et "Équipes" de l'IHM)
+-- =============================================================================
+-- Une ligne par joueur (ou équipe) et par compétition : filtrer sur competition_id.
+-- Matchs joués, minutes, buts et notes viennent des tables de notes : relancer
+-- la partie 3 après chaque import pour que les vues soient à jour.
+--
+-- Note globale : moyenne des notes de match (rating). Pour les joueurs, s'y ajoute
+-- une moyenne pondérée par les minutes jouées (rating_weighted), pour qu'une
+-- entrée de 5 minutes ne pèse pas autant qu'un match complet.
+-- Cartons : yellow_cards = jaunes ('Y'), red_cards = rouges directs et deuxièmes
+-- jaunes ('R' et 'Y/R'). Le premier jaune d'une double sanction reste un jaune.
+-- detailed_stats_matches = nombre de matchs couverts par les tables de la partie 4.
+
+-- Onglet "Joueurs" -------------------------------------------------------------
+-- Seuls les joueurs entrés en jeu sont listés ; un carton reçu sur le banc n'est
+-- pas compté, comme dans la notation.
+CREATE OR REPLACE VIEW v_player_tournament_stats AS
+SELECT m.competition_id,
+       r.player_id,
+       pl.name                                            AS player,
+       r.team_id,
+       t.name                                             AS team,
+       COUNT(*)                                           AS matches_played,
+       COUNT(*) FILTER (WHERE l.is_starter)               AS matches_started,
+       SUM(r.minutes_played)                              AS minutes_played,
+       SUM(r.goals)                                       AS goals,
+       SUM(r.penalty_goals)                               AS penalty_goals,
+       SUM(r.own_goals)                                   AS own_goals,
+       SUM(bk.yellow)                                     AS yellow_cards,
+       SUM(bk.red)                                        AS red_cards,
+       SUM(s.fouls_committed)                             AS fouls_committed,
+       SUM(s.free_kicks_won)                              AS free_kicks_won,
+       SUM(s.free_kicks_conceded)                         AS free_kicks_conceded,
+       SUM(s.duels_won)                                   AS duels_won,
+       SUM(s.duels_lost)                                  AS duels_lost,
+       SUM(s.corners)                                     AS corners,
+       SUM(s.offsides)                                    AS offsides,
+       SUM(s.distance_km)                                 AS distance_km,
+       CASE WHEN COUNT(s.match_id) > 0
+            THEN COUNT(*) FILTER (WHERE s.is_man_of_the_match) END AS man_of_the_match_count,
+       CASE WHEN COUNT(s.match_id) > 0
+            THEN BOOL_OR(s.is_man_of_the_match) END       AS man_of_the_match,
+       COUNT(s.match_id)                                  AS detailed_stats_matches,
+       ROUND(AVG(r.rating), 1)                            AS rating,
+       ROUND(SUM(r.rating * r.minutes_played) / NULLIF(SUM(r.minutes_played), 0), 1) AS rating_weighted
+FROM player_match_rating r
+JOIN match m        ON m.id = r.match_id
+JOIN player pl      ON pl.id = r.player_id
+JOIN team t         ON t.id = r.team_id
+JOIN match_lineup l ON l.match_id = r.match_id AND l.player_id = r.player_id
+LEFT JOIN player_match_stats s ON s.match_id = r.match_id AND s.player_id = r.player_id
+CROSS JOIN LATERAL (
+    SELECT COUNT(*) FILTER (WHERE b.card = 'Y')           AS yellow,
+           COUNT(*) FILTER (WHERE b.card IN ('R', 'Y/R')) AS red
+    FROM booking b WHERE b.match_id = r.match_id AND b.player_id = r.player_id
+) bk
+GROUP BY m.competition_id, r.player_id, pl.name, r.team_id, t.name;
+
+-- Onglet "Équipes" -------------------------------------------------------------
+-- Statistiques détaillées : total publié de l'équipe (team_match_stats) s'il
+-- existe, sinon somme des joueurs du match (player_match_stats).
+CREATE OR REPLACE VIEW v_team_tournament_stats AS
+WITH team_match AS (
+    SELECT r.match_id, r.team_id,
+           COALESCE(ts.fouls_committed,     ps.fouls_committed)     AS fouls_committed,
+           COALESCE(ts.free_kicks_won,      ps.free_kicks_won)      AS free_kicks_won,
+           COALESCE(ts.free_kicks_conceded, ps.free_kicks_conceded) AS free_kicks_conceded,
+           COALESCE(ts.duels_won,           ps.duels_won)           AS duels_won,
+           COALESCE(ts.duels_lost,          ps.duels_lost)          AS duels_lost,
+           COALESCE(ts.corners,             ps.corners)             AS corners,
+           COALESCE(ts.offsides,            ps.offsides)            AS offsides,
+           COALESCE(ts.distance_km,         ps.distance_km)         AS distance_km,
+           (ts.match_id IS NOT NULL OR ps.lines > 0)                AS has_detailed_stats
+    FROM team_match_rating r
+    LEFT JOIN team_match_stats ts ON ts.match_id = r.match_id AND ts.team_id = r.team_id
+    CROSS JOIN LATERAL (
+        SELECT COUNT(*) AS lines,
+               SUM(s.fouls_committed) AS fouls_committed, SUM(s.free_kicks_won) AS free_kicks_won,
+               SUM(s.free_kicks_conceded) AS free_kicks_conceded,
+               SUM(s.duels_won) AS duels_won, SUM(s.duels_lost) AS duels_lost,
+               SUM(s.corners) AS corners, SUM(s.offsides) AS offsides, SUM(s.distance_km) AS distance_km
+        FROM player_match_stats s WHERE s.match_id = r.match_id AND s.team_id = r.team_id
+    ) ps
+)
+SELECT m.competition_id,
+       r.team_id,
+       t.name                                             AS team,
+       COUNT(*)                                           AS matches_played,
+       COUNT(*) FILTER (WHERE r.result = 'W')             AS wins,
+       COUNT(*) FILTER (WHERE r.result = 'D')             AS draws,
+       COUNT(*) FILTER (WHERE r.result = 'L')             AS losses,
+       SUM(r.points)                                      AS points,
+       SUM(r.goals_for)                                   AS goals_for,
+       SUM(r.goals_against)                               AS goals_against,
+       SUM(bk.yellow)                                     AS yellow_cards,
+       SUM(bk.red)                                        AS red_cards,
+       SUM(r.fair_play_points)                            AS fair_play_points,
+       SUM(tm.fouls_committed)                            AS fouls_committed,
+       SUM(tm.free_kicks_won)                             AS free_kicks_won,
+       SUM(tm.free_kicks_conceded)                        AS free_kicks_conceded,
+       SUM(tm.duels_won)                                  AS duels_won,
+       SUM(tm.duels_lost)                                 AS duels_lost,
+       SUM(tm.corners)                                    AS corners,
+       SUM(tm.offsides)                                   AS offsides,
+       SUM(tm.distance_km)                                AS distance_km,
+       COUNT(*) FILTER (WHERE tm.has_detailed_stats)      AS detailed_stats_matches,
+       ROUND(AVG(r.rating), 1)                            AS rating
+FROM team_match_rating r
+JOIN match m       ON m.id = r.match_id
+JOIN team t        ON t.id = r.team_id
+JOIN team_match tm ON tm.match_id = r.match_id AND tm.team_id = r.team_id
+CROSS JOIN LATERAL (
+    SELECT COUNT(*) FILTER (WHERE b.card = 'Y')           AS yellow,
+           COUNT(*) FILTER (WHERE b.card IN ('R', 'Y/R')) AS red
+    FROM booking b WHERE b.match_id = r.match_id AND b.team_id = r.team_id
+) bk
+GROUP BY m.competition_id, r.team_id, t.name;
+
+-- Requêtes de l'IHM ------------------------------------------------------------
+--   Onglet Joueurs : SELECT * FROM v_player_tournament_stats
+--                    WHERE competition_id = :competition
+--                    ORDER BY rating_weighted DESC NULLS LAST, minutes_played DESC;
+--   Onglet Équipes : SELECT * FROM v_team_tournament_stats
+--                    WHERE competition_id = :competition
+--                    ORDER BY rating DESC, points DESC, goals_for - goals_against DESC;
 
 COMMIT;
