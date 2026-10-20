@@ -3,9 +3,12 @@ package com.emocio.analysefoot;
 import com.emocio.analysefoot.dto.MatchRatings;
 import com.emocio.analysefoot.dto.MatchSummary;
 import com.emocio.analysefoot.dto.PlayerRating;
+import com.emocio.analysefoot.dto.PlayerTournamentStats;
 import com.emocio.analysefoot.dto.TeamRanking;
+import com.emocio.analysefoot.dto.TeamTournamentStats;
 import com.emocio.analysefoot.importer.WorldCupImporter;
 import com.emocio.analysefoot.service.RatingQueryService;
+import com.emocio.analysefoot.service.TournamentStatsQueryService;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -63,6 +66,9 @@ class WorldCupImportAndRatingTest {
 
     @Autowired
     private RatingQueryService ratingQueryService;
+
+    @Autowired
+    private TournamentStatsQueryService tournamentStatsQueryService;
 
     @BeforeEach
     void resetDatabase() throws Exception {
@@ -227,6 +233,70 @@ class WorldCupImportAndRatingTest {
             assertThat(ratingQueryService.findTeamRanking()).extracting(TeamRanking::team)
                     .containsExactly("Alpha", "Gamma", "Beta");
         }
+
+        @Test
+        void tournamentStatsAggregateMatchesCardsAndRatings() {
+            PlayerTournamentStats a1 = playerStats("A1");
+            assertThat(a1.matchesPlayed()).isEqualTo(2);
+            assertThat(a1.goals()).isEqualTo(3);
+            assertThat(a1.foulsCommitted()).isNull();
+            assertThat(a1.manOfTheMatch()).isNull();
+            assertThat(a1.detailedStatsMatches()).isZero();
+
+            // B2 : jaune puis deuxième jaune
+            PlayerTournamentStats b2 = playerStats("B2");
+            assertThat(List.of(b2.yellowCards(), b2.redCards())).containsExactly(1, 1);
+
+            TeamTournamentStats beta = teamStats("Beta");
+            assertThat(List.of(beta.matchesPlayed(), beta.yellowCards(), beta.redCards(), beta.fairPlayPoints()))
+                    .containsExactly(1, 1, 2, -7);
+            assertThat(beta.rating()).isEqualByComparingTo("3.2");
+            assertThat(teamStats("Alpha").matchesPlayed()).isEqualTo(2);
+        }
+
+        @Test
+        void tournamentStatsUseDetailedStatsWhenImported() {
+            int finalId = ratingQueryService.findMatches().get(1).id();
+            jdbc.sql("""
+                            INSERT INTO player_match_stats (match_id, player_id, team_id, fouls_committed, distance_km,
+                                                            is_man_of_the_match)
+                            SELECT r.match_id, r.player_id, r.team_id, 2, 10.5, p.name = 'A1'
+                            FROM player_match_rating r JOIN player p ON p.id = r.player_id
+                            WHERE r.match_id = :id
+                            """)
+                    .param("id", finalId).update();
+            jdbc.sql("""
+                            INSERT INTO team_match_stats (match_id, team_id, corners)
+                            SELECT r.match_id, r.team_id, 7 FROM team_match_rating r
+                            JOIN team t ON t.id = r.team_id WHERE r.match_id = :id AND t.name = 'Alpha'
+                            """)
+                    .param("id", finalId).update();
+
+            PlayerTournamentStats a1 = playerStats("A1");
+            assertThat(a1.foulsCommitted()).isEqualTo(2);
+            assertThat(a1.manOfTheMatch()).isTrue();
+            assertThat(a1.manOfTheMatchCount()).isEqualTo(1);
+            assertThat(a1.detailedStatsMatches()).isEqualTo(1);
+            assertThat(playerStats("A2").manOfTheMatch()).isFalse();
+
+            // total publié (corners) prioritaire, sinon somme des joueurs (fautes, distance)
+            TeamTournamentStats alpha = teamStats("Alpha");
+            assertThat(alpha.corners()).isEqualTo(7);
+            assertThat(alpha.foulsCommitted()).isEqualTo(6);
+            assertThat(alpha.distanceKm()).isEqualByComparingTo("31.5");
+            assertThat(teamStats("Gamma").corners()).isNull();
+            assertThat(teamStats("Beta").foulsCommitted()).isNull();
+        }
+    }
+
+    private PlayerTournamentStats playerStats(String name) {
+        return tournamentStatsQueryService.findPlayerStats(null).stream()
+                .filter(p -> p.player().equals(name)).findFirst().orElseThrow();
+    }
+
+    private TeamTournamentStats teamStats(String team) {
+        return tournamentStatsQueryService.findTeamStats(null).stream()
+                .filter(t -> t.team().equals(team)).findFirst().orElseThrow();
     }
 
     private void runRatingScript() throws Exception {

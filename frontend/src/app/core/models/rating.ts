@@ -82,3 +82,58 @@ export interface TeamRanking {
   goalsAgainst: number;
   fairPlayPoints: number;
 }
+
+/** Totaux d'un joueur sur le tournoi ; les stats détaillées sont null tant qu'elles n'ont pas été importées. */
+export interface PlayerTournamentStats {
+  playerId: number;
+  player: string;
+  teamId: number;
+  team: string;
+  matchesPlayed: number;
+  matchesStarted: number;
+  minutesPlayed: number;
+  goals: number;
+  penaltyGoals: number;
+  ownGoals: number;
+  yellowCards: number;
+  redCards: number;
+  foulsCommitted: number | null;
+  freeKicksWon: number | null;
+  freeKicksConceded: number | null;
+  duelsWon: number | null;
+  duelsLost: number | null;
+  corners: number | null;
+  offsides: number | null;
+  distanceKm: number | null;
+  manOfTheMatchCount: number | null;
+  manOfTheMatch: boolean | null;
+  detailedStatsMatches: number;
+  rating: number;
+  ratingWeighted: number | null;
+}
+
+/** Totaux d'une équipe sur le tournoi ; les stats détaillées sont null tant qu'elles n'ont pas été importées. */
+export interface TeamTournamentStats {
+  teamId: number;
+  team: string;
+  matchesPlayed: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  points: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  yellowCards: number;
+  redCards: number;
+  fairPlayPoints: number;
+  foulsCommitted: number | null;
+  freeKicksWon: number | null;
+  freeKicksConceded: number | null;
+  duelsWon: number | null;
+  duelsLost: number | null;
+  corners: number | null;
+  offsides: number | null;
+  distanceKm: number | null;
+  detailedStatsMatches: number;
+  rating: number;
+}
