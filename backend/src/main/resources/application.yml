@@ -5,6 +5,16 @@ spring:
     # Fichier .env facultatif à la racine du projet (ignoré par git) : LLM_KEY=...
     # Une variable d'environnement du même nom reste prioritaire.
     import: optional:file:.env[.properties]
+  ai:
+    mcp:
+      # Serveur MCP « statsfoot » en lecture seule : SSE sur /sse (claude mcp add --transport sse statsfoot http://localhost:8080/sse)
+      server:
+        name: statsfoot
+        version: 1.0.0
+        type: SYNC
+        instructions: >
+          Statistiques du tournoi (dernière compétition importée), en lecture seule. Outils : questions, rank, find,
+          player_report, team_report. Les chiffres viennent de la base ; les données marquées fictives le sont.
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/analysefoot}
     username: ${DB_USERNAME:analysefoot}

@@ -69,7 +69,7 @@ public class AnalyseService {
      * équipe (appellation). Chaque mot saisi doit commencer un mot du nom. Un nom complet exact l'emporte sur les
      * correspondances partielles ; au plus {@value #MAX_FOUND} résultats.
      */
-    List<RankedEntry> findEntities(String question) {
+    public List<RankedEntry> findEntities(String question) {
         String query = QuestionMatcher.normalize(question);
         if (query.length() < 2) {
             return List.of();

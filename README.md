@@ -145,6 +145,23 @@ La réponse de `GET /api/analyse?q=...` indique `interpretation.source` (`KEYWOR
 `LLM_KEY=... ./mvnw -pl backend test -Dtest=AssistantEvalTest -Danalyse.assistant.eval=true
 -Danalyse.assistant.eval.pause-seconds=62` (le quota du proxy impose cette pause : près d'une heure).
 
+### Serveur MCP « statsfoot » (lecture seule)
+
+Le backend expose les mêmes fonctions que l'API comme serveur MCP (Spring AI, transport SSE sur `/sse`), pour
+interroger les statistiques en langage naturel depuis Claude Code ou Claude Desktop. Aucune écriture : mêmes
+requêtes et mêmes vues que l'API ; les données fictives restent signalées.
+
+| Outil | Rôle |
+|---|---|
+| `questions` | les questions du catalogue (identifiant, libellé, portée, fictif) |
+| `rank(criterion)` | classement d'une question : vainqueurs, top 5, règle, fictif |
+| `find(name)` | recherche d'un joueur (nom et/ou prénom) ou d'une équipe : identifiants |
+| `player_report(playerId)` | rapport complet d'un joueur |
+| `team_report(teamId)` | rapport complet d'une équipe |
+
+Application démarrée (`http://localhost:8080`), Claude Code lit `.mcp.json` à la racine ; sinon :
+`claude mcp add --transport sse statsfoot http://localhost:8080/sse`.
+
 ## Build et lancement
 
 ```bash

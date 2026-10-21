@@ -11,7 +11,7 @@ la base PostgreSQL analysefoot. Aucune autre branche, aucun fichier JSON de data
 
 Réalisation (21/10/2026) : spécifiée et réalisée par Spec Kit dans specs/001-onglet-analyse
 (étapes 1 à 4) et specs/002-tool-claude-rank (étape 5, Tool Claude). Hooks de l'étape 6
-réalisés ; le skill ajout-critere-analyse et le MCP statsfoot restent à faire.
+réalisés ; le skill ajout-critere-analyse et le MCP statsfoot sont réalisés (MCP PostgreSQL : à faire).
 
 Constat : sur les 8 questions demandées, 5 doivent encore être précisées avant
 développement. Une reste impossible (aucune donnée de passe), une est contradictoire,
@@ -311,7 +311,7 @@ Rapport équipe :
      (gpt-oss-120b, jeton AWS_BEARER_TOKEN_BEDROCK, non testé en réel) ; désactivé sans clé.
   6. [fait] Hooks : build Angular dans le pre-commit, PreToolUse protégeant les
      migrations (.claude/settings.json), test de cohérence du catalogue.
-     [à faire] Skill ajout-critere-analyse, puis MCP statsfoot en dernier.
+     [fait] Skill ajout-critere-analyse, puis MCP statsfoot (Spring AI, SSE /sse, .mcp.json).
   Chaque étape garde les tests au vert : le hook pre-commit bloque sinon.
 
 

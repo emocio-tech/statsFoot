@@ -9,7 +9,7 @@ Rédige un rapport Markdown à partir des **chiffres calculés par l'application
 
 ## Source des données
 
-1. Si un serveur MCP `statsfoot` est configuré (voir `.mcp.json`), l'utiliser.
+1. Le serveur MCP `statsfoot` (voir `.mcp.json`, outils `questions`, `rank`, `find`, `player_report`, `team_report`) s'il est connecté.
 2. Sinon, l'API REST de l'application (démarrée sur `http://localhost:8080`, sinon la lancer comme décrit au README) :
    - `GET /api/analyse/questions` : les questions du catalogue ;
    - `GET /api/analyse/{questionId}` : classement et vainqueur(s) d'une question ;
