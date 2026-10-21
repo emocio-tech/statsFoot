@@ -12,6 +12,7 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
         <a routerLink="/classements" routerLinkActive="active">Classements</a>
         <a routerLink="/joueurs" routerLinkActive="active">Joueurs</a>
         <a routerLink="/equipes" routerLinkActive="active">Équipes</a>
+        <a routerLink="/analyse" routerLinkActive="active">Analyse</a>
       </nav>
     </header>
     <main>

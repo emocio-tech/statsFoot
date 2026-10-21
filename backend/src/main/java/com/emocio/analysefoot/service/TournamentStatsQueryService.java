@@ -9,7 +9,8 @@ import java.util.List;
 
 /**
  * Lecture des vues v_player_tournament_stats et v_team_tournament_stats (migration V3).
- * Sans compétition précisée, la plus récemment importée est utilisée.
+ * Sans compétition précisée, la plus récemment importée est utilisée. La colonne vide
+ * {@code fictitious_fields} sert le mapping : les DTO renseignent eux-mêmes la liste des champs fictifs.
  */
 @Service
 public class TournamentStatsQueryService {
@@ -24,7 +25,7 @@ public class TournamentStatsQueryService {
     }
 
     public List<PlayerTournamentStats> findPlayerStats(Integer competitionId) {
-        return jdbcClient.sql("SELECT * FROM v_player_tournament_stats WHERE " + COMPETITION_FILTER
+        return jdbcClient.sql("SELECT *, NULL AS fictitious_fields FROM v_player_tournament_stats WHERE " + COMPETITION_FILTER
                         + " ORDER BY rating_weighted DESC NULLS LAST, minutes_played DESC, player")
                 .param("competitionId", competitionId)
                 .query(PlayerTournamentStats.class)
@@ -32,7 +33,7 @@ public class TournamentStatsQueryService {
     }
 
     public List<TeamTournamentStats> findTeamStats(Integer competitionId) {
-        return jdbcClient.sql("SELECT * FROM v_team_tournament_stats WHERE " + COMPETITION_FILTER
+        return jdbcClient.sql("SELECT *, NULL AS fictitious_fields FROM v_team_tournament_stats WHERE " + COMPETITION_FILTER
                         + " ORDER BY rating DESC, points DESC, goals_for - goals_against DESC, team")
                 .param("competitionId", competitionId)
                 .query(TeamTournamentStats.class)

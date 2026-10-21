@@ -9,6 +9,10 @@ Périmètre (mise à jour du 21/10/2026) : tout le travail se fait sur la seule 
 initDonneesNotation, et la seule source de données est donneesStats.sql, appliqué à
 la base PostgreSQL analysefoot. Aucune autre branche, aucun fichier JSON de data/.
 
+Réalisation (21/10/2026) : spécifiée et réalisée par Spec Kit dans specs/001-onglet-analyse
+(étapes 1 à 4) et specs/002-tool-claude-rank (étape 5, Tool Claude). Hooks de l'étape 6
+réalisés ; le skill ajout-critere-analyse et le MCP statsfoot restent à faire.
+
 Constat : sur les 8 questions demandées, 5 doivent encore être précisées avant
 développement. Une reste impossible (aucune donnée de passe), une est contradictoire,
 et trois donnent des égalités ou presque aucun résultat. Les stats détaillées de
@@ -26,18 +30,20 @@ Pile technique :
   - backend Spring Boot 3.5 (Java 25), accès aux données en SQL direct (JdbcClient) ;
   - frontend Angular 20, embarqué dans le jar du backend (un seul livrable) ;
   - PostgreSQL 17, schéma géré par Flyway : V1 (compétitions), V2 (notes),
-    V3 (stats détaillées et vues du tournoi).
+    V3 (stats détaillées et vues du tournoi), V4 (gardien, passes décisives, compléments
+    des vues pour l'onglet Analyse).
 
 donneesStats.sql (backend/src/main/resources/db/migration) : synthèse du modèle et
 script autonome, en 6 parties.
   1. Schéma des compétitions (copie de V1).
   2. Tables de notes (copie de V2).
   3. Calcul des notes de 0 à 10, barème v1 (copie du skill notation-matchs).
-  4. Tables de stats détaillées player_match_stats et team_match_stats (V3).
-  5. Vues v_player_tournament_stats et v_team_tournament_stats (V3).
-  6. Génération des stats détaillées FICTIVES.
-  Règle : toute nouvelle migration (V4...) est recopiée dans donneesStats.sql, et la
-  partie 6 reste la dernière, puisqu'elle lit les notes.
+  4. Tables de stats détaillées, gardien et passes décisives (V3, V4).
+  5. Vues v_player_tournament_stats et v_team_tournament_stats (V3, V4).
+  6. Génération des stats détaillées et des passes décisives FICTIVES.
+  Règles : toute nouvelle migration est recopiée dans donneesStats.sql, et la partie 6
+  reste la dernière, puisqu'elle lit les notes. Sur une base gérée par Flyway, seules
+  les parties de données (3 et 6) sont exécutées, jamais le schéma.
 
 Données :
   - Réelles (worldcup-full.json) : matchs, scores (90 min, prolongation, tirs au
@@ -77,11 +83,11 @@ Déjà en place, à réutiliser :
 
 2) Meilleur passeur
    Critère demandé : le plus de passes.
-   Données         : IMPOSSIBLE. donneesStats.sql ne contient ni passes ni passes
-                     décisives, pas même dans les stats fictives.
-   Proposition     : répondre "donnée non disponible", ou ajouter des passes
-                     fictives à la partie 6 (et à la table player_match_stats par
-                     une migration V4).
+   Données         : aucune passe dans worldcup-full.json. Décision : passes
+                     décisives FICTIVES générées par la partie 6 (table goal_assist,
+                     V4) : 195 passes pour 278 buts éligibles.
+   Critère retenu  : le plus de passes décisives ; égalité départagée par le
+                     moins de minutes jouées (Michael Olise, 6). Données fictives.
 
 3) Joueur le plus agressif
    Critère demandé : le plus de cartons jaunes.
@@ -104,9 +110,10 @@ Déjà en place, à réutiliser :
 
 5) Meilleure équipe
    Critère demandé : non défini.
-   Critère proposé : note moyenne (colonne rating) : Espagne 8,9, puis Argentine
-                     et Mexique 8,1. Alternative : le champion (dernier tour
-                     atteint, à ajouter à la vue équipe).
+   Critère retenu  : le champion (Espagne, vainqueur de la finale 1-0), puis les
+                     équipes par position finale : Argentine finaliste, Angleterre
+                     3e, France 4e, puis les quarts de finale départagés par la
+                     note moyenne.
 
 6) Équipe qui a marqué le plus de buts
    Critère demandé : le plus de buts.
@@ -131,10 +138,9 @@ Déjà en place, à réutiliser :
    Critère proposé : le joueur sans aucun carton qui a joué le plus de minutes
                      (46 joueurs ont joué au moins 450 minutes sans carton).
                      Rapport sur le joueur.
-   Problème        : ce critère désigne des gardiens (Emiliano Martinez 810 min,
-                     Unai Simon 750 min). En excluant les gardiens, c'est Lionel
-                     Messi (740 min). Il faut décider si les gardiens comptent ;
-                     l'indicateur gardien est à ajouter à la vue joueur (V4).
+   Décision        : gardiens exclus (sinon Emiliano Martinez, 810 min). Réponse :
+                     Lionel Messi, 740 minutes sans carton. Indicateur gardien :
+                     match_lineup.is_goalkeeper (V4).
 
 
 2. ARCHITECTURE PROPOSÉE
@@ -234,18 +240,23 @@ Existant (V3, parties 4 et 5 de donneesStats.sql) :
     détaillées que les joueurs, note moyenne.
   - Une ligne par compétition : filtrer sur competition_id.
 
-À ajouter (migration V4, recopiée dans donneesStats.sql) :
-  - joueur : points de fair-play FIFA, deuxièmes jaunes séparés des rouges
-    directs, buts décisifs (présents par match dans player_match_rating),
-    indicateur gardien (règle de la partie 6, à rendre permanente) ;
-  - équipe : dernier tour atteint ;
-  - ratios par 90 minutes, utiles pour départager les égalités.
+Réalisé (migration V4, recopiée dans donneesStats.sql) :
+  - match_lineup.is_goalkeeper : gardien de chaque feuille de match (donnée réelle) ;
+  - goal_assist : passes décisives FICTIVES, générées par la partie 6 ;
+  - joueur : passes décisives, deuxièmes jaunes, rouges directs, points de
+    fair-play FIFA, buts décisifs, indicateur gardien ;
+  - équipe : dernier tour atteint (stage_reached) et position finale
+    (final_position : 1 champion ... 8 phase de groupes) ;
+  - ratios par 90 minutes : calculés dans les règles de départage du catalogue.
   Ces vues restent la source unique pour l'API, l'outil et le MCP.
 
-Routes à créer :
-  - POST /api/analyse                : répond à une question.
-  - GET  /api/players/{id}/report    : rapport joueur.
-  - GET  /api/teams/{id}/report      : rapport équipe.
+Routes réalisées (en lecture, GET) :
+  - GET /api/analyse/questions      : les 8 questions ;
+  - GET /api/analyse/{questionId}   : réponse à une question ;
+  - GET /api/analyse?q=...          : question libre (mots-clés) ;
+  - GET /api/players/{id}/report    : rapport joueur ;
+  - GET /api/teams/{id}/report      : rapport équipe.
+  Le POST /api/analyse prévu ne servait qu'au modèle de langage, reporté.
 
 Rapport joueur :
   - identité, équipe, matchs joués, minutes ;
@@ -276,36 +287,41 @@ Rapport équipe :
   - Les éventuels ex aequo, affichés et non cachés.
   - Le rapport complet en dessous, puis le top 5 pour situer le résultat (avec le
     tableau triable déjà utilisé par les onglets Joueurs et Équipes).
-  - Une question non reconnue affiche les questions disponibles.
-    "Meilleur passeur" affiche "donnée non disponible".
+  - Une question non reconnue affiche les questions disponibles ; une question
+    ambiguë ("le moins fair-play") propose les questions possibles.
+  - "Meilleur passeur" répond avec les passes décisives fictives, mention
+    "données fictives" à l'appui.
 
 
 6. ÉTAPES DE RÉALISATION (commits successifs sur initDonneesNotation)
 ---------------------------------------------------------------------
 
-  1. Migration V4 : compléments des vues, recopiés dans donneesStats.sql ; tests
-     sur worldcup-sample.json.
-  2. Rapports joueur et équipe : routes, puis ouverture depuis les onglets Joueurs
-     et Équipes.
-  3. Catalogue des critères et POST /api/analyse, avec la reconnaissance par
-     mots-clés.
-  4. Onglet Analyse.
-  5. Tool Claude (SDK Anthropic), en complément des mots-clés.
-  6. Skill ajout-critere-analyse, hooks (build Angular, protection des
-     migrations), puis MCP statsfoot en dernier.
+  1. [fait] Migration V4 : compléments des vues, recopiés dans donneesStats.sql ;
+     tests sur worldcup-sample.json.
+  2. [fait] Rapports joueur et équipe : routes, puis ouverture depuis les onglets
+     Joueurs et Équipes.
+  3. [fait] Catalogue des critères et routes /api/analyse, avec la reconnaissance
+     par mots-clés.
+  4. [fait] Onglet Analyse.
+  5. [fait] Tool Claude rank (SDK Anthropic, Claude Haiku 5.5), consulté seulement quand
+     les mots-clés échouent ; désactivé sans clé ANTHROPIC_API_KEY.
+  6. [fait] Hooks : build Angular dans le pre-commit, PreToolUse protégeant les
+     migrations (.claude/settings.json), test de cohérence du catalogue.
+     [à faire] Skill ajout-critere-analyse, puis MCP statsfoot en dernier.
   Chaque étape garde les tests au vert : le hook pre-commit bloque sinon.
 
 
-7. DÉCISIONS À PRENDRE AVANT DE COMMENCER
------------------------------------------
+7. DÉCISIONS (tranchées le 21/10/2026)
+-------------------------------------
 
-  1. Meilleur passeur : générer des passes fictives dans donneesStats.sql, ou
-     retirer la question pour l'instant ?
-  2. Quatre critères à valider : la définition de la meilleure équipe, les deux
-     critères de fair-play (points FIFA plutôt que nombre de rouges ou de Y/R) et
-     la règle pour le joueur le plus fair-play (gardiens inclus ou non).
-  3. Stats fictives : peut-on s'en servir pour départager des égalités ou pour
-     de nouvelles questions (homme du match, distance), à condition de le
-     signaler ?
-  4. Appel à l'API Claude : l'accepter côté backend (clé d'API, coût, données
-     envoyées) ou s'en tenir aux mots-clés et aux suggestions ?
+  1. Meilleur passeur : passes décisives FICTIVES générées par donneesStats.sql
+     (partie 6), réponse marquée "données fictives".
+  2. Critères : meilleure équipe = le champion, puis les équipes par position
+     finale (à position égale, la note moyenne) ; les deux critères de fair-play
+     utilisent les points FIFA ; le joueur le plus fair-play exclut les gardiens
+     (réponse : Lionel Messi, 740 minutes sans carton).
+  3. Stats fictives : réservées au meilleur passeur et aux rubriques des
+     rapports, toujours signalées ; aucun départage ne les utilise.
+  4. API Claude : oui, en second recours (specs/002-tool-claude-rank) : consulté
+     seulement si les mots-clés ne reconnaissent pas la question, clé Anthropic
+     dédiée (ANTHROPIC_API_KEY), mention de transmission sous la barre de recherche.

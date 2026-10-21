@@ -15,6 +15,15 @@ spring:
 server:
   port: 8080
 
+# Assistant d'interprétation des questions libres (tool Claude rank) ; désactivé sans clé.
+# La clé se donne par la variable d'environnement ANTHROPIC_API_KEY, jamais dans le dépôt.
+analyse:
+  assistant:
+    api-key: ${ANTHROPIC_API_KEY:}
+    model: claude-haiku-5-5
+    timeout: 3s
+    max-per-minute: 30
+
 management:
   endpoints:
     web:

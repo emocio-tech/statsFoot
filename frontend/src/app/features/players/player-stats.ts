@@ -1,8 +1,9 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { TournamentStatsService } from '../../core/services/tournament-stats.service';
 import { PlayerTournamentStats } from '../../core/models/rating';
-import { StatsColumn, StatsTable } from '../../shared/stats-table';
+import { StatsColumn, StatsTable, markFictitious } from '../../shared/stats-table';
 
 @Component({
   selector: 'app-player-stats',
@@ -11,15 +12,8 @@ import { StatsColumn, StatsTable } from '../../shared/stats-table';
     <h2>Joueurs</h2>
     <p class="muted">
       Totaux sur l'ensemble du tournoi, pour chaque joueur entré en jeu. Note : moyenne des notes de match
-      pondérée par les minutes jouées. Cliquer sur un en-tête pour trier.
+      pondérée par les minutes jouées. Cliquer sur un en-tête pour trier, sur une ligne pour ouvrir le rapport.
     </p>
-
-    @if (stats() !== undefined && !hasDetailedStats()) {
-      <p class="notice">
-        Fautes, coups francs, duels, corners, hors-jeu, distance et homme du match ne sont pas encore importés :
-        ils s'affichent « – ».
-      </p>
-    }
 
     <div class="filters">
       <label>
@@ -39,13 +33,16 @@ import { StatsColumn, StatsTable } from '../../shared/stats-table';
 
     <app-stats-table
       [rows]="filtered()"
-      [columns]="columns"
+      [columns]="columns()"
       rowKey="playerId"
+      [clickable]="true"
+      (rowClick)="open($event)"
       [emptyText]="stats() === undefined ? 'Chargement…' : 'Aucun joueur.'"
     />
+    <p class="legend muted">* données fictives : générées pour la démonstration, non issues des matchs réels.</p>
   `,
   styles: `
-    .notice { padding: 0.5rem 0.75rem; border-left: 3px solid var(--accent); background: var(--surface); }
+    .legend { font-size: 0.85rem; margin-top: 0.5rem; }
     .filters { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin: 1rem 0; font-size: 0.9rem; }
     .filters label { color: var(--muted); }
     input, select { margin-left: 0.3rem; font: inherit; }
@@ -53,6 +50,7 @@ import { StatsColumn, StatsTable } from '../../shared/stats-table';
 })
 export class PlayerStats {
   private readonly statsService = inject(TournamentStatsService);
+  private readonly router = inject(Router);
 
   protected readonly stats = toSignal(this.statsService.getPlayerStats());
   protected readonly search = signal('');
@@ -67,9 +65,8 @@ export class PlayerStats {
     );
   });
 
-  protected readonly hasDetailedStats = computed(() => (this.stats() ?? []).some((p) => p.detailedStatsMatches > 0));
 
-  protected readonly columns: StatsColumn<PlayerTournamentStats>[] = [
+  private readonly baseColumns: StatsColumn<PlayerTournamentStats>[] = [
     { key: 'player', label: 'Joueur', kind: 'text', sub: 'team' },
     { key: 'matchesPlayed', label: 'MJ', title: 'Matchs joués', kind: 'int' },
     { key: 'minutesPlayed', label: 'Min', title: 'Minutes jouées', kind: 'int' },
@@ -87,4 +84,10 @@ export class PlayerStats {
     { key: 'manOfTheMatchCount', label: 'HdM', title: 'Homme du match (nombre de fois)', kind: 'motm' },
     { key: 'ratingWeighted', label: 'Note', title: 'Note globale du tournoi', kind: 'rating' },
   ];
+
+  protected readonly columns = computed(() => markFictitious(this.baseColumns, this.stats()?.[0]?.fictitiousFields));
+
+  protected open(row: PlayerTournamentStats): void {
+    this.router.navigate(['/joueurs', row.playerId]);
+  }
 }

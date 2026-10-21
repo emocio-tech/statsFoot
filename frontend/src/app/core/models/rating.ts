@@ -110,6 +110,8 @@ export interface PlayerTournamentStats {
   detailedStatsMatches: number;
   rating: number;
   ratingWeighted: number | null;
+  /** Champs dont les valeurs sont FICTIVES. */
+  fictitiousFields: string[];
 }
 
 /** Totaux d'une équipe sur le tournoi ; les stats détaillées sont null tant qu'elles n'ont pas été importées. */
@@ -136,4 +138,6 @@ export interface TeamTournamentStats {
   distanceKm: number | null;
   detailedStatsMatches: number;
   rating: number;
+  /** Champs dont les valeurs sont FICTIVES. */
+  fictitiousFields: string[];
 }

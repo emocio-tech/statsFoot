@@ -25,15 +25,19 @@ public class MatchLineup {
 
     private boolean isCaptain;
 
+    private boolean isGoalkeeper;
+
     protected MatchLineup() {
     }
 
-    public MatchLineup(Match match, Player player, Team team, boolean isStarter, boolean isCaptain) {
+    public MatchLineup(Match match, Player player, Team team, boolean isStarter, boolean isCaptain,
+                       boolean isGoalkeeper) {
         this.match = match;
         this.player = player;
         this.team = team;
         this.isStarter = isStarter;
         this.isCaptain = isCaptain;
+        this.isGoalkeeper = isGoalkeeper;
     }
 
     public Match getMatch() {
@@ -54,5 +58,9 @@ public class MatchLineup {
 
     public boolean isCaptain() {
         return isCaptain;
+    }
+
+    public boolean isGoalkeeper() {
+        return isGoalkeeper;
     }
 }

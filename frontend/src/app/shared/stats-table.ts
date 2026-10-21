@@ -1,4 +1,4 @@
-import { Component, computed, input, signal } from '@angular/core';
+import { Component, computed, input, output, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { RatingBadge } from './rating-badge';
 
@@ -12,6 +12,14 @@ export interface StatsColumn<T> {
   kind: StatsColumnKind;
   /** Texte secondaire affiché après la valeur (colonne texte). */
   sub?: keyof T & string;
+  /** Valeurs FICTIVES : en-tête marqué d'un astérisque. */
+  fictitious?: boolean;
+}
+
+/** Marque comme fictives les colonnes listées par l'API (champ {@code fictitiousFields}). */
+export function markFictitious<T>(columns: StatsColumn<T>[], fields: readonly string[] | undefined): StatsColumn<T>[] {
+  const fictitious = new Set(fields ?? []);
+  return columns.map((c) => ({ ...c, fictitious: fictitious.has(c.key) }));
 }
 
 /**
@@ -26,12 +34,15 @@ export interface StatsColumn<T> {
       <table>
         <thead>
           <tr>
-            <th scope="col" class="num">#</th>
+            @if (showIndex()) {
+              <th scope="col" class="num">#</th>
+            }
             @for (c of columns(); track c.key) {
               <th scope="col" [class.num]="c.kind !== 'text'" [class.sticky]="$first"
                   [attr.aria-sort]="sortKey() === c.key ? (descending() ? 'descending' : 'ascending') : null">
-                <button type="button" [title]="c.title ?? c.label" (click)="sortBy(c)">
-                  {{ c.label }}
+                <button type="button" [title]="(c.title ?? c.label) + (c.fictitious ? ' (donnée fictive)' : '')"
+                        (click)="sortBy(c)">
+                  {{ c.label }}@if (c.fictitious) {<span class="fictitious" aria-label="donnée fictive">*</span>}
                   @if (sortKey() === c.key) {
                     <span aria-hidden="true">{{ descending() ? '▾' : '▴' }}</span>
                   }
@@ -42,8 +53,11 @@ export interface StatsColumn<T> {
         </thead>
         <tbody>
           @for (row of sorted(); track row[rowKey()]; let i = $index) {
-            <tr>
-              <td class="num muted">{{ i + 1 }}</td>
+            <tr [class.clickable]="clickable()" [attr.tabindex]="clickable() ? 0 : null"
+                (click)="clickable() && rowClick.emit(row)" (keydown.enter)="clickable() && rowClick.emit(row)">
+              @if (showIndex()) {
+                <td class="num muted">{{ i + 1 }}</td>
+              }
               @for (c of columns(); track c.key) {
                 @let v = $any(row)[c.key];
                 @switch (c.kind) {
@@ -85,7 +99,7 @@ export interface StatsColumn<T> {
               }
             </tr>
           } @empty {
-            <tr><td [attr.colspan]="columns().length + 1" class="muted">{{ emptyText() }}</td></tr>
+            <tr><td [attr.colspan]="columns().length + (showIndex() ? 1 : 0)" class="muted">{{ emptyText() }}</td></tr>
           }
         </tbody>
       </table>
@@ -100,8 +114,11 @@ export interface StatsColumn<T> {
       padding: 0.45rem 0.4rem; width: 100%; text-align: inherit;
     }
     th button:hover { color: var(--text); }
+    .fictitious { color: var(--accent); margin-left: 0.1em; }
     td { padding: 0.35rem 0.4rem; border-top: 1px solid var(--border); }
     tbody tr:hover td { background: var(--hover); }
+    tr.clickable { cursor: pointer; }
+    tr.clickable:focus-visible td { outline: 2px solid var(--accent); outline-offset: -2px; }
     .num { text-align: right; font-variant-numeric: tabular-nums; }
     .sticky { position: sticky; left: 0; background: var(--surface); z-index: 1; }
   `,
@@ -111,6 +128,11 @@ export class StatsTable<T extends object> {
   readonly columns = input.required<StatsColumn<T>[]>();
   readonly rowKey = input.required<keyof T & string>();
   readonly emptyText = input('Aucune donnée.');
+  /** Numéro de ligne en première colonne ; à désactiver quand les lignes portent déjà un rang. */
+  readonly showIndex = input(true);
+  /** Lignes cliquables (et activables au clavier) : émet la ligne par {@code rowClick}. */
+  readonly clickable = input(false);
+  readonly rowClick = output<T>();
 
   protected readonly sortKey = signal<(keyof T & string) | null>(null);
   protected readonly descending = signal(true);

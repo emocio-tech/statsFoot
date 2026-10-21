@@ -170,15 +170,18 @@ public class WorldCupImporter {
     /** @return les joueurs de la feuille de match, par nom */
     private Map<String, Player> importLineup(Match match, Team team, LineupJson lineup, Lookups lookups) {
         Map<String, Player> roster = new HashMap<>();
+        // le premier titulaire de la composition est le gardien
+        boolean goalkeeper = true;
         for (LineupPlayerJson starter : lineup.starter()) {
             Player player = lookups.player(team, starter.name());
             roster.put(starter.name(), player);
-            matchLineupRepository.save(new MatchLineup(match, player, team, true, starter.captain()));
+            matchLineupRepository.save(new MatchLineup(match, player, team, true, starter.captain(), goalkeeper));
+            goalkeeper = false;
         }
         for (LineupPlayerJson substitute : lineup.bench()) {
             Player player = lookups.player(team, substitute.name());
             roster.put(substitute.name(), player);
-            matchLineupRepository.save(new MatchLineup(match, player, team, false, substitute.captain()));
+            matchLineupRepository.save(new MatchLineup(match, player, team, false, substitute.captain(), false));
         }
         for (SubJson sub : lineup.subs()) {
             WorldCupParsers.Minute minute = WorldCupParsers.parseMinute(sub.minute());

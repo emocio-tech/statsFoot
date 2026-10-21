@@ -5,21 +5,24 @@
 --   Partie 1  schéma des compétitions  (V1__init_schema.sql)
 --   Partie 2  tables de notes          (V2__match_ratings.sql)
 --   Partie 3  calcul des notes 0 à 10  (compute_ratings.sql du skill notation-matchs)
---   Partie 4  statistiques détaillées par match (V3__tournament_stats.sql)
---   Partie 5  vues des onglets "Joueurs" et "Équipes" (V3__tournament_stats.sql)
---   Partie 6  stats détaillées FICTIVES (efface et régénère les tables de la partie 4)
+--   Partie 4  stats détaillées, gardien, passes décisives (V3__tournament_stats.sql, V4__analyse.sql)
+--   Partie 5  vues du tournoi : onglets Joueurs, Équipes, Analyse (V3__tournament_stats.sql, V4__analyse.sql)
+--   Partie 6  stats détaillées et passes décisives FICTIVES (efface et régénère)
 --
--- Usage (psql) :
+-- Parties de schéma (1, 2, 4, 5) : copies des migrations, créent ce qui manque sans modifier
+-- l'existant. Parties de données (3, 6) : effacent et recalculent notes et stats fictives ;
+-- elles forment une seule transaction (BEGIN en partie 3, COMMIT en fin de partie 6).
+--
+-- Base gérée par Flyway (application, tests) : n'exécuter QUE les parties 3 et 6, jamais le
+-- schéma (constitution, principe I) :
+--   { echo '\set ON_ERROR_STOP on'
+--     sed -n '/^-- PARTIE 3 /,/^-- PARTIE 4 /p' donneesStats.sql | sed '$d'
+--     sed -n '/^-- PARTIE 6 /,$p' donneesStats.sql; } | psql -U analysefoot -h localhost -d <base>
+--
+-- Base autonome, hors Flyway : tout le fichier.
 --   psql -U analysefoot -h localhost -d <base> -v ON_ERROR_STOP=1 -f donneesStats.sql
---
--- Les parties 1, 2 et 4 créent les tables absentes. Elles ne modifient pas une table
--- existante. La partie 3 efface et recalcule toutes les notes à chaque exécution.
--- La partie 5 (re)crée les vues ; elle ne stocke rien.
---
--- Dans l'application, le schéma reste géré par Flyway (backend/src/main/resources/db/migration).
--- Ce fichier en est une copie de lecture et sert aussi de script autonome. Il ne doit
--- pas être lancé sur une base que Flyway gère encore vide : Flyway refuserait ensuite
--- de migrer une base qui contient déjà des tables.
+-- Ne jamais lancer le fichier entier sur une base que Flyway gère encore vide : Flyway
+-- refuserait ensuite de migrer une base qui contient déjà des tables.
 -- En cas de modification d'une migration ou du barème, mettre ce fichier à jour.
 -- =============================================================================
 
@@ -449,6 +452,48 @@ CREATE TABLE IF NOT EXISTS team_match_stats (
 );
 
 
+-- Gardien et passes décisives (V4__analyse.sql) ---------------------------------------
+-- L'import marque le premier titulaire de chaque composition (le gardien). Rétro-remplissage :
+-- le n°1 de l'équipe (son premier joueur créé) s'il est titulaire, sinon le titulaire jamais
+-- aligné en même temps que lui. Passes décisives : FICTIVES, remplies par la partie 6.
+ALTER TABLE match_lineup ADD COLUMN IF NOT EXISTS is_goalkeeper BOOLEAN NOT NULL DEFAULT FALSE;
+
+WITH first_gk AS (
+    SELECT team_id, MIN(id) AS player_id FROM player GROUP BY team_id
+), starter AS (
+    SELECT match_id, team_id, player_id FROM match_lineup WHERE is_starter
+), goalkeeper AS (
+    SELECT s.match_id, s.player_id
+    FROM starter s JOIN first_gk g ON g.player_id = s.player_id
+    UNION ALL
+    SELECT * FROM (
+        SELECT DISTINCT ON (s.match_id, s.team_id) s.match_id, s.player_id
+        FROM starter s
+        JOIN first_gk g ON g.team_id = s.team_id
+        WHERE NOT EXISTS (SELECT 1 FROM starter x WHERE x.match_id = s.match_id AND x.player_id = g.player_id)
+          AND NOT EXISTS (SELECT 1 FROM starter a JOIN starter b ON b.match_id = a.match_id AND b.player_id = g.player_id
+                          WHERE a.player_id = s.player_id)
+        ORDER BY s.match_id, s.team_id, s.player_id
+    ) backup
+)
+UPDATE match_lineup l SET is_goalkeeper = TRUE
+FROM goalkeeper g
+WHERE l.match_id = g.match_id AND l.player_id = g.player_id;
+
+-- Un seul gardien titulaire par équipe et par match
+CREATE UNIQUE INDEX IF NOT EXISTS uq_lineup_goalkeeper ON match_lineup(match_id, team_id) WHERE is_goalkeeper;
+
+-- Passes décisives (FICTIVES) ----------------------------------------------------------
+-- Au plus une par but ; jamais sur un penalty ni un but contre son camp ; passeur coéquipier du
+-- buteur, sur le terrain à l'instant du but (règles appliquées par la partie 6 de donneesStats.sql).
+CREATE TABLE IF NOT EXISTS goal_assist (
+    goal_id    INT PRIMARY KEY REFERENCES goal(id) ON DELETE CASCADE,
+    player_id  INT NOT NULL REFERENCES player(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_goal_assist_player ON goal_assist(player_id);
+
+
 -- =============================================================================
 -- PARTIE 5 : VUES DU TOURNOI (onglets "Joueurs" et "Équipes" de l'IHM)
 -- =============================================================================
@@ -494,7 +539,13 @@ SELECT m.competition_id,
             THEN BOOL_OR(s.is_man_of_the_match) END       AS man_of_the_match,
        COUNT(s.match_id)                                  AS detailed_stats_matches,
        ROUND(AVG(r.rating), 1)                            AS rating,
-       ROUND(SUM(r.rating * r.minutes_played) / NULLIF(SUM(r.minutes_played), 0), 1) AS rating_weighted
+       ROUND(SUM(r.rating * r.minutes_played) / NULLIF(SUM(r.minutes_played), 0), 1) AS rating_weighted,
+       CASE WHEN EXISTS (SELECT 1 FROM goal_assist) THEN SUM(ga.assists) END AS assists,
+       SUM(bk.second_yellow)                              AS second_yellows,
+       SUM(bk.direct_red)                                 AS direct_reds,
+       SUM(bk.fair_play)                                  AS fair_play_points,
+       SUM(r.decisive_goals)                              AS decisive_goals,
+       BOOL_OR(l.is_goalkeeper)                           AS is_goalkeeper
 FROM player_match_rating r
 JOIN match m        ON m.id = r.match_id
 JOIN player pl      ON pl.id = r.player_id
@@ -503,14 +554,23 @@ JOIN match_lineup l ON l.match_id = r.match_id AND l.player_id = r.player_id
 LEFT JOIN player_match_stats s ON s.match_id = r.match_id AND s.player_id = r.player_id
 CROSS JOIN LATERAL (
     SELECT COUNT(*) FILTER (WHERE b.card = 'Y')           AS yellow,
-           COUNT(*) FILTER (WHERE b.card IN ('R', 'Y/R')) AS red
+           COUNT(*) FILTER (WHERE b.card IN ('R', 'Y/R')) AS red,
+           COUNT(*) FILTER (WHERE b.card = 'Y/R')         AS second_yellow,
+           COUNT(*) FILTER (WHERE b.card = 'R')           AS direct_red,
+           COALESCE(SUM(CASE b.card WHEN 'Y' THEN -1 WHEN 'Y/R' THEN -2 WHEN 'R' THEN -4 END), 0) AS fair_play
     FROM booking b WHERE b.match_id = r.match_id AND b.player_id = r.player_id
 ) bk
+CROSS JOIN LATERAL (
+    SELECT COUNT(*) AS assists
+    FROM goal_assist a JOIN goal g ON g.id = a.goal_id
+    WHERE g.match_id = r.match_id AND a.player_id = r.player_id
+) ga
 GROUP BY m.competition_id, r.player_id, pl.name, r.team_id, t.name;
 
--- Onglet "Équipes" -------------------------------------------------------------
--- Statistiques détaillées : total publié de l'équipe (team_match_stats) s'il
--- existe, sinon somme des joueurs du match (player_match_stats).
+-- stage_reached  : phase du dernier match joué
+-- final_position : 1 champion (vainqueur de la finale, tirs au but compris), 2 finaliste,
+--                  3 vainqueur du match pour la 3e place, 4 perdant de ce match (ou demi-finaliste
+--                  sans match pour la 3e place), 5 quart, 6 huitième, 7 seizième, 8 phase de groupes
 CREATE OR REPLACE VIEW v_team_tournament_stats AS
 WITH team_match AS (
     SELECT r.match_id, r.team_id,
@@ -533,6 +593,11 @@ WITH team_match AS (
                SUM(s.corners) AS corners, SUM(s.offsides) AS offsides, SUM(s.distance_km) AS distance_km
         FROM player_match_stats s WHERE s.match_id = r.match_id AND s.team_id = r.team_id
     ) ps
+), last_match AS (
+    SELECT DISTINCT ON (m.competition_id, r.team_id) m.competition_id, r.team_id, m.stage,
+           (r.result = 'W' OR (r.result = 'D' AND COALESCE(r.won_shootout, FALSE))) AS won
+    FROM team_match_rating r JOIN match m ON m.id = r.match_id
+    ORDER BY m.competition_id, r.team_id, m.kickoff_at DESC, m.id DESC
 )
 SELECT m.competition_id,
        r.team_id,
@@ -556,11 +621,22 @@ SELECT m.competition_id,
        SUM(tm.offsides)                                   AS offsides,
        SUM(tm.distance_km)                                AS distance_km,
        COUNT(*) FILTER (WHERE tm.has_detailed_stats)      AS detailed_stats_matches,
-       ROUND(AVG(r.rating), 1)                            AS rating
+       ROUND(AVG(r.rating), 1)                            AS rating,
+       MIN(lm.stage)                                      AS stage_reached,
+       MIN(CASE lm.stage
+               WHEN 'FINAL'         THEN CASE WHEN lm.won THEN 1 ELSE 2 END
+               WHEN 'THIRD_PLACE'   THEN CASE WHEN lm.won THEN 3 ELSE 4 END
+               WHEN 'SEMI_FINAL'    THEN 4
+               WHEN 'QUARTER_FINAL' THEN 5
+               WHEN 'ROUND_OF_16'   THEN 6
+               WHEN 'ROUND_OF_32'   THEN 7
+               ELSE 8
+           END)                                           AS final_position
 FROM team_match_rating r
 JOIN match m       ON m.id = r.match_id
 JOIN team t        ON t.id = r.team_id
 JOIN team_match tm ON tm.match_id = r.match_id AND tm.team_id = r.team_id
+JOIN last_match lm ON lm.competition_id = m.competition_id AND lm.team_id = r.team_id
 CROSS JOIN LATERAL (
     SELECT COUNT(*) FILTER (WHERE b.card = 'Y')           AS yellow,
            COUNT(*) FILTER (WHERE b.card IN ('R', 'Y/R')) AS red
@@ -580,8 +656,8 @@ GROUP BY m.competition_id, r.team_id, t.name;
 -- =============================================================================
 -- PARTIE 6 : STATISTIQUES DÉTAILLÉES FICTIVES (en attendant une vraie source)
 -- =============================================================================
--- ATTENTION : données INVENTÉES. Cette partie efface puis remplit player_match_stats
--- et team_match_stats. Ne plus l'exécuter une fois des stats réelles importées.
+-- ATTENTION : données INVENTÉES. Cette partie efface puis remplit player_match_stats,
+-- team_match_stats et goal_assist. Ne plus l'exécuter une fois des stats réelles importées.
 --
 -- Générées à partir des matchs réels, de façon déterministe : un même pseudo-aléa
 -- (md5 de la graine + identifiants) donne les mêmes valeurs à chaque exécution.
@@ -598,40 +674,27 @@ GROUP BY m.competition_id, r.team_id, t.name;
 --     indirect) ; coups francs obtenus par l'équipe = coups francs concédés par
 --     l'adversaire. Pour un joueur, "obtenus" = fautes subies, réparties entre les
 --     joueurs à partir des fautes de l'adversaire. Les penaltys ne sont pas isolés.
---   - Gardien (premier titulaire de la feuille de match, retrouvé sans la position
---     qui n'est pas stockée) : environ 5 km, pas de corner ni de hors-jeu, très
---     peu de fautes et de duels.
+--   - Gardien (match_lineup.is_goalkeeper, premier titulaire de la feuille de match) :
+--     environ 5 km, pas de corner ni de hors-jeu, très peu de fautes et de duels.
 --   - Hors-jeu surtout pour les buteurs du tournoi, corners concentrés sur quelques
 --     tireurs par équipe, distance propre à chaque joueur (9,6 à 11,6 km / 90 min).
 --   - Homme du match : meilleure note du match (puis buts, victoire, minutes).
+--   - Passes décisives (goal_assist) : au plus une par but, pour 75 % des buts ; jamais sur
+--     un penalty ni sur un but contre son camp ; passeur = coéquipier du buteur présent sur le
+--     terrain à l'instant du but, choisi selon un profil "créateur" stable (gardien rarement).
 -- Les totaux entiers d'une équipe sont répartis entre ses joueurs au prorata d'un
 -- poids, au plus fort reste : la somme des joueurs tombe juste.
 
 -- Tirage pseudo-aléatoire dans [0, 1), stable pour des arguments donnés
-CREATE FUNCTION pg_temp.rnd(VARIADIC parts text[]) RETURNS double precision
+CREATE OR REPLACE FUNCTION pg_temp.rnd(VARIADIC parts text[]) RETURNS double precision
 LANGUAGE sql IMMUTABLE AS $$
     SELECT ('x' || substr(md5('fictif-v1|' || array_to_string(parts, '|')), 1, 8))::bit(32)::bigint / 4294967296.0
 $$;
 
 -- Gardien de chaque équipe à chaque match ---------------------------------------
--- Le n°1 est le premier joueur créé de l'équipe (premier titulaire de son premier
--- match). S'il ne joue pas, c'est un titulaire jamais aligné en même temps que lui.
+-- Lu dans match_lineup.is_goalkeeper (premier titulaire de la feuille de match, V4).
 CREATE TEMP TABLE fs_goalkeeper ON COMMIT DROP AS
-WITH first_gk AS (
-    SELECT team_id, MIN(id) AS player_id FROM player GROUP BY team_id
-), starter AS (
-    SELECT match_id, team_id, player_id FROM match_lineup WHERE is_starter
-)
-SELECT s.match_id, s.team_id, s.player_id
-FROM starter s JOIN first_gk g ON g.player_id = s.player_id
-UNION ALL
-SELECT DISTINCT ON (s.match_id, s.team_id) s.match_id, s.team_id, s.player_id
-FROM starter s
-JOIN first_gk g ON g.team_id = s.team_id
-WHERE NOT EXISTS (SELECT 1 FROM starter x WHERE x.match_id = s.match_id AND x.player_id = g.player_id)
-  AND NOT EXISTS (SELECT 1 FROM starter a JOIN starter b ON b.match_id = a.match_id AND b.player_id = g.player_id
-                  WHERE a.player_id = s.player_id)
-ORDER BY 1, 2, 3;
+SELECT match_id, team_id, player_id FROM match_lineup WHERE is_goalkeeper;
 
 -- Équipes : domination et objectifs par match -------------------------------------
 -- Les tirages "de match" sont faits du point de vue de team1, puis inversés pour
@@ -789,5 +852,46 @@ JOIN (
     SELECT match_id, team_id, SUM(fouls_committed) AS fouls, SUM(offsides) AS offsides
     FROM player_match_stats GROUP BY match_id, team_id
 ) o ON o.match_id = s.match_id AND o.team_id = t.opponent_id;
+
+-- Passes décisives ------------------------------------------------------------------
+-- Présence sur le terrain : entrée au coup d'envoi (titulaire) ou au remplacement, sortie au
+-- remplacement ou à l'exclusion ; instants t = minute x 100 + temps additionnel (comme la partie 3).
+CREATE TEMP TABLE fs_presence ON COMMIT DROP AS
+WITH entry AS (
+    SELECT l.match_id, l.player_id, l.team_id, -1 AS on_t
+    FROM match_lineup l WHERE l.is_starter
+    UNION ALL
+    SELECT s.match_id, s.player_in_id, s.team_id, s.minute * 100 + COALESCE(s.added_time, 0)
+    FROM substitution s
+), leave AS (
+    SELECT match_id, player_out_id AS player_id, minute * 100 + COALESCE(added_time, 0) AS t
+    FROM substitution
+    UNION ALL
+    SELECT match_id, player_id, minute * 100 + COALESCE(added_time, 0)
+    FROM booking WHERE card IN ('R', 'Y/R')
+)
+SELECT e.match_id, e.player_id, e.team_id, e.on_t, COALESCE(x.t, 99999) AS off_t
+FROM entry e
+LEFT JOIN LATERAL (
+    SELECT l.t FROM leave l
+    WHERE l.match_id = e.match_id AND l.player_id = e.player_id AND l.t >= e.on_t
+    ORDER BY l.t LIMIT 1
+) x ON TRUE;
+
+DELETE FROM goal_assist;
+
+INSERT INTO goal_assist (goal_id, player_id)
+SELECT DISTINCT ON (g.id) g.id, p.player_id
+FROM goal g
+JOIN fs_presence p ON p.match_id = g.match_id AND p.team_id = g.team_id AND p.player_id <> g.player_id
+                  AND p.on_t < g.minute * 100 + COALESCE(g.added_time, 0)
+                  AND g.minute * 100 + COALESCE(g.added_time, 0) <= p.off_t
+LEFT JOIN fs_goalkeeper gk ON gk.match_id = g.match_id AND gk.player_id = p.player_id
+WHERE NOT g.is_penalty AND NOT g.is_own_goal
+  AND pg_temp.rnd(g.id::text, 'assist') < 0.75
+ORDER BY g.id,
+         pg_temp.rnd(p.player_id::text, 'creator') * CASE WHEN gk.player_id IS NULL THEN 1 ELSE 0.1 END
+           * pg_temp.rnd(g.id::text, p.player_id::text, 'assist_pick') DESC,
+         p.player_id;
 
 COMMIT;

@@ -66,6 +66,59 @@ Les notes (0 à 10) des joueurs et des équipes sont calculées par le skill Cla
 | `GET /api/rankings/players?minMatches=3&limit=20` | joueurs par note moyenne |
 | `GET /api/rankings/teams` | équipes par note moyenne |
 
+### Statistiques du tournoi et onglet Analyse
+
+`backend/src/main/resources/db/migration/donneesStats.sql` regroupe le schéma (copie des migrations V1 à V4),
+le calcul des notes et la génération de statistiques détaillées **fictives** : fautes, coups francs, duels,
+corners, hors-jeu, distance, homme du match et passes décisives. La migration V4 ajoute le gardien de chaque
+feuille de match (donnée réelle) et la table des passes décisives.
+
+Sur une base gérée par Flyway, n'exécuter que les parties de données (3 : notes, 6 : stats fictives),
+jamais le schéma :
+
+```bash
+F=backend/src/main/resources/db/migration/donneesStats.sql
+{ echo '\set ON_ERROR_STOP on'
+  sed -n '/^-- PARTIE 3 /,/^-- PARTIE 4 /p' "$F" | sed '$d'
+  sed -n '/^-- PARTIE 6 /,$p' "$F"; } | psql -U analysefoot -h localhost -d analysefoot
+```
+
+| Route | Contenu |
+|---|---|
+| `GET /api/stats/players` | totaux du tournoi par joueur (onglet Joueurs) ; `fictitiousFields` liste les champs fictifs |
+| `GET /api/stats/teams` | totaux du tournoi par équipe (onglet Équipes) ; `fictitiousFields` liste les champs fictifs |
+| `GET /api/analyse/questions` | les 8 questions de l'onglet Analyse |
+| `GET /api/analyse/{questionId}` | réponse à une question : gagnants (ex aequo compris), critère, top 5 |
+| `GET /api/analyse?q=...` | question libre, reconnue par mots-clés (reconnue, ambiguë ou non reconnue) |
+| `GET /api/players/{id}/report` | rapport complet d'un joueur, dont son rang sur chaque critère |
+| `GET /api/teams/{id}/report` | rapport complet d'une équipe : parcours, position finale, effectif |
+
+Les stats détaillées et les passes décisives sont inventées (cohérentes avec les matchs réels) : l'interface
+les signale par un astérisque et la mention « données fictives ».
+
+### Assistant d'interprétation (tool Claude `rank`)
+
+Quand les mots-clés ne reconnaissent pas une question libre de l'onglet Analyse (ou la jugent ambiguë),
+le backend peut la faire interpréter par Claude Haiku 5.5 (`claude-haiku-5-5`) avec un unique tool
+`rank(criterion, scope)` : le modèle ne fait que choisir une des 8 questions du catalogue (ou aucune) ;
+les chiffres viennent toujours du SQL. Seule la question saisie est transmise à Anthropic ; elle n'est
+pas journalisée. Délai de 3 s, plafond de 30 appels par minute, repli silencieux sur les mots-clés.
+
+L'assistant est **désactivé** tant que la variable d'environnement `ANTHROPIC_API_KEY` n'est pas définie
+(côté serveur, jamais commitée) :
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-... java -jar backend/target/analyse-foot.jar
+```
+
+| Route | Contenu |
+|---|---|
+| `GET /api/analyse/assistant` | `{"enabled": true\|false}` : assistant configuré ou non |
+
+La réponse de `GET /api/analyse?q=...` indique `interpretation.source` (`KEYWORDS` ou `ASSISTANT`) et
+`interpretation.understoodAs`. Évaluation réelle (payante, moins d'un centime) :
+`ANTHROPIC_API_KEY=... ./mvnw -pl backend test -Dtest=AssistantEvalTest -Danalyse.assistant.eval=true`.
+
 ## Build et lancement
 
 ```bash
@@ -87,7 +140,8 @@ Les tests d'import et de notation utilisent une base PostgreSQL dédiée, vidée
 CREATE DATABASE analysefoot_test OWNER analysefoot;
 ```
 
-Un hook Git lance ces tests avant chaque commit et l'annule en cas d'échec. À activer une fois par clone :
+Un hook Git lance le build Angular et ces tests avant chaque commit et l'annule en cas d'échec. À activer une
+fois par clone :
 
 ```bash
 git config core.hooksPath .githooks
