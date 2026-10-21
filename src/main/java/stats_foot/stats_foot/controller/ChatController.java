@@ -4,10 +4,12 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
+import org.springframework.core.Ordered;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import stats_foot.stats_foot.chat.TokenUsageLoggingAdvisor;
 import stats_foot.stats_foot.player.tool.PlayerTools;
 
 @RestController
@@ -44,7 +46,9 @@ public class ChatController {
         ChatMemory chatMemory = MessageWindowChatMemory.builder().maxMessages(10).build();
         this.chatClient = chatClientBuilder
                 .defaultSystem(SYSTEM_PROMPT)
-                .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
+                .defaultAdvisors(
+                        MessageChatMemoryAdvisor.builder(chatMemory).build(),
+                        new TokenUsageLoggingAdvisor(Ordered.LOWEST_PRECEDENCE))
                 .defaultTools(playerTools)
                 .build();
     }
