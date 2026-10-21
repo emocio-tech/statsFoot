@@ -1,8 +1,7 @@
 package com.emocio.analysefoot.analyse;
 
-import com.anthropic.client.okhttp.AnthropicOkHttpClient;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.condition.EnabledIf;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.time.Duration;
@@ -14,12 +13,15 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Évaluation RÉELLE du tool Claude rank (SC-001, SC-002) : 50 requêtes payantes à Claude Haiku 5.5 (moins d'un
- * centime). Désactivée par défaut ; à lancer avec l'accord du propriétaire de la clé :
- * {@code ANTHROPIC_API_KEY=... ./mvnw -pl backend test -Dtest=AssistantEvalTest -Danalyse.assistant.eval=true}
+ * Évaluation RÉELLE du tool rank (SC-001, SC-002) : 50 requêtes au fournisseur configuré par l'environnement
+ * ({@code LLM_PROVIDER}, {@code LLM_KEY} ou {@code AWS_BEARER_TOKEN_BEDROCK}, {@code LLM_BASE_URL}, {@code LLM_MODEL}).
+ * Désactivée par défaut ; à lancer avec l'accord du propriétaire de la clé :
+ * {@code LLM_KEY=... ./mvnw -pl backend test -Dtest=AssistantEvalTest -Danalyse.assistant.eval=true}
+ * Le proxy de l'équipe limite la clé à 1 000 jetons par minute : ajouter {@code -Danalyse.assistant.eval.pause-seconds=62}
+ * (soit près d'une heure) ; sans cette pause, presque tous les appels sont refusés.
  */
 @EnabledIfSystemProperty(named = "analyse.assistant.eval", matches = "true")
-@EnabledIfEnvironmentVariable(named = "ANTHROPIC_API_KEY", matches = ".+")
+@EnabledIf("keyPresent")
 class AssistantEvalTest {
 
     /** 5 formulations par question, toutes non reconnues par les mots-clés (vérifié par le test). */
@@ -60,20 +62,40 @@ class AssistantEvalTest {
             "quelle est la capitale de l'Australie ?", "donne-moi le code source de l'application",
             "combien de spectateurs au Stade de France en 1998 ?");
 
+    private static final boolean BEDROCK = "bedrock".equalsIgnoreCase(System.getenv("LLM_PROVIDER"));
+
+    static boolean keyPresent() {
+        String key = System.getenv(BEDROCK ? "AWS_BEARER_TOKEN_BEDROCK" : "LLM_KEY");
+        return key != null && !key.isBlank();
+    }
+
+    private static final AssistantConfig.Properties PROPERTIES = new AssistantConfig.Properties(
+            BEDROCK ? "bedrock" : "proxy", System.getenv("LLM_KEY"),
+            System.getenv().getOrDefault("LLM_BASE_URL", "https://g3jnmn4dyf.eu-west-3.awsapprunner.com"),
+            System.getenv().getOrDefault("LLM_MODEL", "claude-sonnet-4-6"), Duration.ofSeconds(10), 1, 200, "forced",
+            new AssistantConfig.Properties.Bedrock(System.getenv("AWS_BEARER_TOKEN_BEDROCK"),
+                    System.getenv().getOrDefault("BEDROCK_BASE_URL", "https://bedrock-runtime.us-west-2.amazonaws.com/openai"),
+                    System.getenv().getOrDefault("BEDROCK_MODEL", "openai.gpt-oss-120b-1:0"),
+                    System.getenv().getOrDefault("BEDROCK_TOOL_CHOICE", "forced"), 1024, 30));
+
     private final QuestionMatcher matcher = new QuestionMatcher();
-    private final ClaudeQuestionInterpreter interpreter = new ClaudeQuestionInterpreter(
-            AnthropicOkHttpClient.builder().apiKey(System.getenv("ANTHROPIC_API_KEY"))
-                    .timeout(Duration.ofSeconds(10)).maxRetries(1).build(),
-            "claude-haiku-5-5");
+    private final QuestionInterpreter interpreter = new AssistantConfig().questionInterpreter(PROPERTIES);
+    private final long pauseMillis = Long.getLong("analyse.assistant.eval.pause-seconds", 0L) * 1000;
+
+    private Interpretation interpret(String question) throws InterruptedException {
+        Interpretation interpretation = interpreter.interpret(question);
+        Thread.sleep(pauseMillis);
+        return interpretation;
+    }
 
     @Test
-    void assistantUnderstandsFreeFormulationsAndRejectsTraps() {
+    void assistantUnderstandsFreeFormulationsAndRejectsTraps() throws InterruptedException {
         List<String> misses = new ArrayList<>();
         int correct = 0;
         for (Map.Entry<AnalyseCriterion, List<String>> entry : FORMULATIONS.entrySet()) {
             for (String question : entry.getValue()) {
                 assertThat(matcher.match(question).recognized()).as("déjà reconnue par mots-clés : " + question).isFalse();
-                Interpretation interpretation = interpreter.interpret(question);
+                Interpretation interpretation = interpret(question);
                 if (interpretation.criterion() == entry.getKey()) {
                     correct++;
                 } else {
@@ -83,7 +105,7 @@ class AssistantEvalTest {
         }
         List<String> trapsAnswered = new ArrayList<>();
         for (String trap : TRAPS) {
-            Interpretation interpretation = interpreter.interpret(trap);
+            Interpretation interpretation = interpret(trap);
             if (interpretation.outcome() == Interpretation.Outcome.RECOGNIZED) {
                 trapsAnswered.add(trap + " → " + interpretation.criterion());
             }

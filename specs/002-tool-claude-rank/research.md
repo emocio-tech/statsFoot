@@ -6,6 +6,16 @@ Références : [spec.md](spec.md), constitution v1.1.0 (principes V et VII), `sp
 
 ## R1. Modèle et SDK
 
+> **Révision du 21/10/2026** : le compte Anthropic n'ayant pas de crédit, l'assistant utilise le LLM du projet :
+> `claude-sonnet-4-6` servi par le proxy LiteLLM de l'équipe au format Anthropic (clé `LLM_KEY`, adresse
+> `LLM_BASE_URL`). `nova-lite` ne sait pas appeler un tool imposé. Le proxy limite la clé à 1 000 jetons par
+> minute en fenêtre fixe et réserve le `max_tokens` demandé : `max_tokens` = 200 et un seul appel par minute.
+> **Spring AI** (`spring-ai-openai` 1.1.8, branche compatible Spring Boot 3.5) appelle ensuite les deux fournisseurs
+> au format OpenAI Chat Completions ; il remplace le SDK Anthropic. Le client est construit à la main (pas de starter :
+> l'autoconfiguration exige une clé au démarrage), sans nouvelle tentative, avec le tool rank jamais exécuté
+> (`internalToolExecutionEnabled(false)`). Le reste de ce document (Haiku 5.5, `ANTHROPIC_API_KEY`, SDK Anthropic)
+> décrit le choix initial.
+
 - **Decision** : SDK officiel `com.anthropic:anthropic-java` (2.34.0) ; modèle `claude-haiku-5-5`
   (identifiant exact, sans suffixe de date) ; client `AnthropicOkHttpClient` construit avec la clé
   `ANTHROPIC_API_KEY`.

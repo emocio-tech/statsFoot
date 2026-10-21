@@ -31,7 +31,7 @@ export interface AnalyseInterpretation {
   understoodAs: string | null;
 }
 
-/** L'assistant est-il configuré (clé ANTHROPIC_API_KEY côté serveur) ? */
+/** L'assistant est-il configuré (clé LLM_KEY côté serveur) ? */
 export interface AssistantStatus {
   enabled: boolean;
 }

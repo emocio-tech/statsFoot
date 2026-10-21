@@ -303,8 +303,10 @@ Rapport équipe :
   3. [fait] Catalogue des critères et routes /api/analyse, avec la reconnaissance
      par mots-clés.
   4. [fait] Onglet Analyse.
-  5. [fait] Tool Claude rank (SDK Anthropic, Claude Haiku 5.5), consulté seulement quand
-     les mots-clés échouent ; désactivé sans clé ANTHROPIC_API_KEY.
+  5. [fait] Tool rank par le ChatClient de Spring AI (format OpenAI), consulté seulement quand
+     les mots-clés échouent ; LLM du projet (claude-sonnet-4-6 via le proxy LiteLLM de
+     l'équipe, clé LLM_KEY dans .env) ou, au choix (LLM_PROVIDER=bedrock), Amazon Bedrock
+     (gpt-oss-120b, jeton AWS_BEARER_TOKEN_BEDROCK, non testé en réel) ; désactivé sans clé.
   6. [fait] Hooks : build Angular dans le pre-commit, PreToolUse protégeant les
      migrations (.claude/settings.json), test de cohérence du catalogue.
      [à faire] Skill ajout-critere-analyse, puis MCP statsfoot en dernier.
@@ -322,6 +324,7 @@ Rapport équipe :
      (réponse : Lionel Messi, 740 minutes sans carton).
   3. Stats fictives : réservées au meilleur passeur et aux rubriques des
      rapports, toujours signalées ; aucun départage ne les utilise.
-  4. API Claude : oui, en second recours (specs/002-tool-claude-rank) : consulté
-     seulement si les mots-clés ne reconnaissent pas la question, clé Anthropic
-     dédiée (ANTHROPIC_API_KEY), mention de transmission sous la barre de recherche.
+  4. LLM : oui, en second recours (specs/002-tool-claude-rank) : consulté seulement
+     si les mots-clés ne reconnaissent pas la question ; LLM du projet (clé LLM_KEY,
+     proxy LiteLLM de l'équipe, modèle claude-sonnet-4-6), mention de transmission
+     sous la barre de recherche.

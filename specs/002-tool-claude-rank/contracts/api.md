@@ -27,51 +27,66 @@ Même comportement que dans `specs/001-onglet-analyse/contracts/api.md`, avec de
 { "enabled": true }
 ```
 
-`enabled` est faux sans clé `ANTHROPIC_API_KEY`. L'interface n'affiche la mention de transmission (FR-008)
+`enabled` est faux sans clé `LLM_KEY`. L'interface n'affiche la mention de transmission (FR-008)
 que si `enabled` est vrai.
 
-## 2. Appel à l'API Claude (Messages API, `POST /v1/messages` via le SDK Java)
+## 2. Appel au LLM du projet (format OpenAI Chat Completions, `POST /v1/chat/completions`, via le `ChatClient` de Spring AI)
 
 | Élément | Valeur |
 |---------|--------|
-| Modèle | `claude-haiku-5-5` |
-| `max_tokens` | 1024 |
+| Modèle | `claude-sonnet-4-6` (configurable ; `nova-lite` n'appelle pas le tool) |
+| `max_tokens` | 200 pour le proxy, qui réserve ce plafond dans son quota (réponse d'environ 75 jetons) ; `max_completion_tokens` 1024 pour Bedrock (le raisonnement de gpt-oss compte dedans) |
 | `system` | texte fixe : rôle (choisir une question du catalogue), les 8 questions (identifiant, libellé, portée, ce qu'elles mesurent), règle `NONE` hors catalogue, règle d'ambiguïté |
-| `messages` | un seul message utilisateur : la question saisie, telle quelle |
-| `tools` | `rank` (voir ci-dessous), `strict: true` |
-| `tool_choice` | `{ "type": "tool", "name": "rank" }` |
+| `messages` | un message système (consignes) et un message utilisateur : la question saisie, telle quelle (jamais traitée comme un modèle de texte) |
+| `tools` | un tool `function` `rank` (voir ci-dessous) ; jamais exécuté par Spring AI |
+| `tool_choice` | `{ "type": "function", "function": { "name": "rank" } }` (`auto` si `LLM_TOOL_CHOICE=auto`) |
 | Absent | `temperature`, `top_p`, `top_k`, `thinking`, données du tournoi, identité du visiteur |
-| Client | délai 3 s, aucune nouvelle tentative |
+| Client | délai 3 s (connexion et lecture), aucune nouvelle tentative (`RetryTemplate` à 1 essai) |
 
-Définition du tool :
+Définition du tool (format OpenAI ; le schéma est le même qu'avec le format Anthropic) :
 
 ```json
 {
-  "name": "rank",
-  "description": "Choisit la question du catalogue de l'onglet Analyse qui correspond à la question du visiteur. Ne calcule rien.",
-  "strict": true,
-  "input_schema": {
-    "type": "object",
-    "additionalProperties": false,
-    "required": ["criterion", "scope", "alternatives"],
-    "properties": {
-      "criterion": { "type": "string", "enum": ["TOP_SCORER", "TOP_ASSIST", "MOST_YELLOW_CARDS", "LEAST_FAIR_PLAY_PLAYER", "BEST_TEAM", "TOP_SCORING_TEAM", "LEAST_FAIR_PLAY_TEAM", "MOST_FAIR_PLAY_PLAYER", "NONE"] },
-      "scope": { "type": "string", "enum": ["PLAYER", "TEAM", "UNKNOWN"] },
-      "alternatives": { "type": "array", "items": { "type": "string", "enum": ["TOP_SCORER", "TOP_ASSIST", "MOST_YELLOW_CARDS", "LEAST_FAIR_PLAY_PLAYER", "BEST_TEAM", "TOP_SCORING_TEAM", "LEAST_FAIR_PLAY_TEAM", "MOST_FAIR_PLAY_PLAYER"] } }
+  "type": "function",
+  "function": {
+    "name": "rank",
+    "description": "Choisit la question du catalogue de l'onglet Analyse qui correspond à la question du visiteur. Ne calcule rien : les réponses sont calculées par l'application.",
+    "parameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["criterion", "scope", "alternatives"],
+      "properties": {
+        "criterion": { "type": "string", "enum": ["TOP_SCORER", "TOP_ASSIST", "MOST_YELLOW_CARDS", "LEAST_FAIR_PLAY_PLAYER", "BEST_TEAM", "TOP_SCORING_TEAM", "LEAST_FAIR_PLAY_TEAM", "MOST_FAIR_PLAY_PLAYER", "NONE"] },
+        "scope": { "type": "string", "enum": ["PLAYER", "TEAM", "UNKNOWN"] },
+        "alternatives": { "type": "array", "items": { "type": "string", "enum": ["TOP_SCORER", "TOP_ASSIST", "MOST_YELLOW_CARDS", "LEAST_FAIR_PLAY_PLAYER", "BEST_TEAM", "TOP_SCORING_TEAM", "LEAST_FAIR_PLAY_TEAM", "MOST_FAIR_PLAY_PLAYER"] } }
+      }
     }
   }
 }
 ```
 
-Lecture de la réponse : `stop_reason` doit valoir `tool_use` et le contenu porter un bloc `tool_use` nommé
-`rank` ; son entrée est validée (data-model §1). Tout autre cas (dont `refusal`, `max_tokens`, erreur,
-délai dépassé) → aucune interprétation, repli sur les mots-clés.
+Lecture de la réponse : `choices[0].message.tool_calls` doit contenir un appel nommé `rank` dont `arguments` (chaîne JSON)
+est validé par le serveur (data-model §1). Tout autre cas (texte seul, arguments illisibles, erreur HTTP, délai
+dépassé) → aucune interprétation, repli sur les mots-clés. La consommation (`usage.prompt_tokens`,
+`completion_tokens`) est journalisée, jamais la question.
 
 ## 3. Configuration
 
+Fournisseur choisi par `LLM_PROVIDER` : `proxy` (défaut) ou `bedrock`. Spring AI ajoute `/v1/chat/completions` à l'adresse.
+
 | Propriété | Défaut | Rôle |
 |-----------|--------|------|
-| `analyse.assistant.api-key` | `${ANTHROPIC_API_KEY:}` | vide → assistant désactivé |
-| `analyse.assistant.model` | `claude-haiku-5-5` | modèle |
-| `analyse.assistant.timeout` | `3s` | délai d'un appel |
-| `analyse.assistant.max-per-minute` | `30` | plafond partagé |
+| `analyse.assistant.provider` | `${LLM_PROVIDER:proxy}` | `proxy` ou `bedrock` |
+| `analyse.assistant.api-key` | `${LLM_KEY:}` | clé du proxy ; vide → assistant désactivé |
+| `analyse.assistant.base-url` | `${LLM_BASE_URL:https://g3jnmn4dyf.eu-west-3.awsapprunner.com}` | proxy LiteLLM de l'équipe |
+| `analyse.assistant.model` | `${LLM_MODEL:claude-sonnet-4-6}` | modèle (`nova-lite` n'appelle pas le tool) |
+| `analyse.assistant.timeout` | `${LLM_TIMEOUT:3s}` | délai d'un appel |
+| `analyse.assistant.max-tokens` | `${LLM_MAX_TOKENS:200}` | plafond de la réponse (le proxy le réserve dans son quota) |
+| `analyse.assistant.max-per-minute` | `${LLM_MAX_PER_MINUTE:1}` | plafond partagé (quota du proxy : 1 000 jetons par minute) |
+| `analyse.assistant.tool-choice` | `${LLM_TOOL_CHOICE:forced}` | `forced` ou `auto` |
+| `analyse.assistant.bedrock.api-key` | `${AWS_BEARER_TOKEN_BEDROCK:}` | jeton Bedrock ; vide → assistant désactivé |
+| `analyse.assistant.bedrock.base-url` | `${BEDROCK_BASE_URL:https://bedrock-runtime.us-west-2.amazonaws.com/openai}` | Amazon Bedrock |
+| `analyse.assistant.bedrock.model` | `${BEDROCK_MODEL:openai.gpt-oss-120b-1:0}` | modèle Bedrock |
+| `analyse.assistant.bedrock.tool-choice` | `${BEDROCK_TOOL_CHOICE:forced}` | `forced` ou `auto` |
+| `analyse.assistant.bedrock.max-tokens` | `${BEDROCK_MAX_TOKENS:1024}` | envoyé en `max_completion_tokens` |
+| `analyse.assistant.bedrock.max-per-minute` | `${BEDROCK_MAX_PER_MINUTE:30}` | plafond partagé |

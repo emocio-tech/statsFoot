@@ -33,7 +33,7 @@ interface TopRow {
       <button type="submit">Rechercher</button>
     </form>
     @if (assistant().enabled) {
-      <p class="notice muted">Une question non reconnue peut être transmise à Anthropic (Claude) pour être interprétée.</p>
+      <p class="notice muted">Une question non reconnue peut être transmise au LLM du projet (Claude via le proxy de l'équipe) pour être interprétée.</p>
     }
 
     <nav class="suggestions" aria-label="Questions proposées">

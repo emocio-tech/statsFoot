@@ -1,6 +1,10 @@
 spring:
   application:
     name: analyse-foot
+  config:
+    # Fichier .env facultatif à la racine du projet (ignoré par git) : LLM_KEY=...
+    # Une variable d'environnement du même nom reste prioritaire.
+    import: optional:file:.env[.properties]
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/analysefoot}
     username: ${DB_USERNAME:analysefoot}
@@ -15,14 +19,33 @@ spring:
 server:
   port: 8080
 
-# Assistant d'interprétation des questions libres (tool Claude rank) ; désactivé sans clé.
-# La clé se donne par la variable d'environnement ANTHROPIC_API_KEY, jamais dans le dépôt.
+# Assistant d'interprétation des questions libres (tool rank) par le ChatClient de Spring AI, format OpenAI, au
+# choix du fournisseur LLM_PROVIDER :
+#  - proxy (défaut) : LLM du projet, proxy LiteLLM de l'équipe, clé LLM_KEY ;
+#  - bedrock : Amazon Bedrock (gpt-oss), jeton AWS_BEARER_TOKEN_BEDROCK.
+# Désactivé sans clé. Les clés se donnent dans le fichier .env ou en variable d'environnement, jamais dans le dépôt.
 analyse:
   assistant:
-    api-key: ${ANTHROPIC_API_KEY:}
-    model: claude-haiku-5-5
-    timeout: 3s
-    max-per-minute: 30
+    provider: ${LLM_PROVIDER:proxy}
+    # Spring AI ajoute /v1/chat/completions à l'adresse
+    api-key: ${LLM_KEY:}
+    base-url: ${LLM_BASE_URL:https://g3jnmn4dyf.eu-west-3.awsapprunner.com}
+    model: ${LLM_MODEL:claude-sonnet-4-6}
+    timeout: ${LLM_TIMEOUT:3s}
+    # Le proxy réserve max_tokens dans son quota (1 000 jetons par minute pour cette clé, fenêtre fixe) et un appel
+    # en consomme environ 1 600 : un seul appel par minute passe. À relever avec la limite de la clé.
+    max-tokens: ${LLM_MAX_TOKENS:200}
+    max-per-minute: ${LLM_MAX_PER_MINUTE:1}
+    # forced : tool_choice imposé sur rank ; auto : si le modèle refuse de se voir imposer un tool
+    tool-choice: ${LLM_TOOL_CHOICE:forced}
+    bedrock:
+      api-key: ${AWS_BEARER_TOKEN_BEDROCK:}
+      base-url: ${BEDROCK_BASE_URL:https://bedrock-runtime.us-west-2.amazonaws.com/openai}
+      model: ${BEDROCK_MODEL:openai.gpt-oss-120b-1:0}
+      tool-choice: ${BEDROCK_TOOL_CHOICE:forced}
+      # gpt-oss raisonne : ses jetons de réflexion comptent dans ce plafond
+      max-tokens: ${BEDROCK_MAX_TOKENS:1024}
+      max-per-minute: ${BEDROCK_MAX_PER_MINUTE:30}
 
 management:
   endpoints:

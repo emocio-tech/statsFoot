@@ -19,7 +19,14 @@
 - Q: Comment informer le visiteur ? → A: une mention permanente sous la barre de recherche
   (FR-008).
 - Q: Quel accès utiliser ? → A: une clé API Anthropic dédiée (`ANTHROPIC_API_KEY`), modèle
-  Claude Haiku (FR-009).
+  Claude Haiku (FR-009). **Révisé le 21/10/2026** : le compte Anthropic n'ayant pas de crédit, le LLM
+  du projet est utilisé à la place : clé `LLM_KEY` (fichier `.env`), proxy LiteLLM de l'équipe au
+  format Anthropic, modèle `claude-sonnet-4-6` (`nova-lite` testé : n'appelle pas le tool).
+  **Complété le 21/10/2026** : Amazon Bedrock (interface OpenAI, `openai.gpt-oss-120b-1:0`, jeton
+  `AWS_BEARER_TOKEN_BEDROCK`) s'ajoute au proxy comme second fournisseur, choisi par `LLM_PROVIDER`
+  (`proxy` par défaut, `bedrock`). Même tool, même validation ; pas encore testé en réel (jeton absent).
+  **Complété le 21/10/2026** : les deux fournisseurs sont appelés par le `ChatClient` de Spring AI
+  (format OpenAI Chat Completions), qui remplace le SDK Anthropic et le client HTTP maison.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -141,14 +148,19 @@ par l'assistant, et vérifier l'affichage de l'interprétation et de son origine
 - **FR-008**: Une mention permanente sous la barre de recherche MUST informer le visiteur
   qu'une question libre non reconnue peut être transmise à un service externe (Anthropic)
   pour être interprétée ; la mention n'apparaît que si l'assistant est configuré.
-- **FR-009**: L'assistant MUST être un modèle Claude Haiku d'Anthropic, accédé par une clé
-  API Anthropic dédiée lue dans la variable `ANTHROPIC_API_KEY` ; la clé MUST rester côté
-  serveur, hors du dépôt, jamais transmise au navigateur. Sans clé, l'assistant est
-  considéré comme non configuré (FR-005).
+- **FR-009**: L'assistant MUST être le LLM du projet (modèle `claude-sonnet-4-6` servi par le
+  proxy de l'équipe, adresse et modèle configurables), appelé par le `ChatClient` de Spring AI et
+  accédé par la clé `LLM_KEY` (fichier
+  `.env` ou variable d'environnement) ; la clé MUST rester côté serveur, hors du dépôt, jamais
+  transmise au navigateur. Sans clé, l'assistant est considéré comme non configuré (FR-005).
+  Un second fournisseur, Amazon Bedrock (`LLM_PROVIDER=bedrock`, jeton `AWS_BEARER_TOKEN_BEDROCK`),
+  peut être choisi ; le fournisseur actif est le seul à recevoir les questions.
 - **FR-010**: Les suggestions cliquables MUST continuer à répondre sans jamais consulter
   l'assistant.
-- **FR-011**: L'usage de l'assistant MUST être plafonné (au plus 30 questions par minute pour
-  l'ensemble des visiteurs) ; au-delà, seuls les mots-clés s'appliquent.
+- **FR-011**: L'usage de l'assistant MUST être plafonné pour l'ensemble des visiteurs ; au-delà,
+  seuls les mots-clés s'appliquent. Plafond réglable, 1 question par minute par défaut : le proxy
+  du projet limite la clé à 1 000 jetons par minute (fenêtre fixe, mesuré le 21/10/2026) et un appel
+  en consomme environ 1 600.
 
 ### Key Entities *(include if feature involves data)*
 

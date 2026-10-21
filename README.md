@@ -96,28 +96,54 @@ F=backend/src/main/resources/db/migration/donneesStats.sql
 Les stats détaillées et les passes décisives sont inventées (cohérentes avec les matchs réels) : l'interface
 les signale par un astérisque et la mention « données fictives ».
 
-### Assistant d'interprétation (tool Claude `rank`)
+### Assistant d'interprétation (tool `rank`, Spring AI)
 
-Quand les mots-clés ne reconnaissent pas une question libre de l'onglet Analyse (ou la jugent ambiguë),
-le backend peut la faire interpréter par Claude Haiku 5.5 (`claude-haiku-5-5`) avec un unique tool
-`rank(criterion, scope)` : le modèle ne fait que choisir une des 8 questions du catalogue (ou aucune) ;
-les chiffres viennent toujours du SQL. Seule la question saisie est transmise à Anthropic ; elle n'est
-pas journalisée. Délai de 3 s, plafond de 30 appels par minute, repli silencieux sur les mots-clés.
+Quand les mots-clés ne reconnaissent pas une question libre de l'onglet Analyse (ou la jugent ambiguë), le backend
+peut la faire interpréter par un LLM, via le `ChatClient` de Spring AI (format OpenAI Chat Completions) et un
+unique tool `rank(criterion, scope)`. Le modèle ne fait que choisir une des 8 questions du catalogue (ou aucune) ;
+le tool n'est jamais exécuté et les chiffres viennent toujours du SQL. Seule la question saisie est transmise ;
+elle n'est pas journalisée (seuls le nombre de jetons et le type d'une erreur le sont). Délai de 3 s, aucune
+nouvelle tentative, repli silencieux sur les mots-clés.
 
-L'assistant est **désactivé** tant que la variable d'environnement `ANTHROPIC_API_KEY` n'est pas définie
-(côté serveur, jamais commitée) :
+Deux fournisseurs, choisis par `LLM_PROVIDER` :
+- `proxy` (défaut) : le LLM du projet, `claude-sonnet-4-6` sur le proxy LiteLLM de l'équipe ;
+- `bedrock` : Amazon Bedrock, modèle `openai.gpt-oss-120b-1:0` (non testé en réel : jeton absent).
+
+L'assistant est **désactivé** tant que la clé du fournisseur n'est pas fournie (côté serveur, jamais commitée). Le
+plus simple : le fichier `.env` à la racine du projet (ignoré par git), lu au démarrage quand l'application est
+lancée depuis la racine :
 
 ```bash
-ANTHROPIC_API_KEY=sk-ant-... java -jar backend/target/analyse-foot.jar
+echo LLM_KEY=... > .env
+java -jar backend/target/analyse-foot.jar
 ```
+
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `LLM_PROVIDER` | `proxy` | `proxy` ou `bedrock` |
+| `LLM_KEY` | (vide) | clé du proxy ; vide → assistant désactivé |
+| `LLM_BASE_URL` | `https://g3jnmn4dyf.eu-west-3.awsapprunner.com` | adresse du proxy (Spring AI ajoute `/v1/chat/completions`) |
+| `LLM_MODEL` | `claude-sonnet-4-6` | modèle (doit savoir appeler un tool imposé ; `nova-lite` ne le sait pas) |
+| `LLM_MAX_TOKENS` | `200` | plafond de la réponse ; le proxy le réserve dans son quota |
+| `LLM_MAX_PER_MINUTE` | `1` | plafond d'appels par minute ; le proxy limite la clé à 1 000 jetons par minute et un appel en consomme environ 1 600 : à relever avec la limite de la clé |
+| `LLM_TOOL_CHOICE` | `forced` | `forced` (tool imposé) ou `auto` |
+| `AWS_BEARER_TOKEN_BEDROCK` | (vide) | jeton Bedrock (fournisseur `bedrock`) ; vide → assistant désactivé |
+| `BEDROCK_BASE_URL` | `https://bedrock-runtime.us-west-2.amazonaws.com/openai` | adresse Bedrock |
+| `BEDROCK_MODEL` | `openai.gpt-oss-120b-1:0` | modèle Bedrock |
+| `BEDROCK_MAX_TOKENS` | `1024` | envoyé en `max_completion_tokens` (le raisonnement de gpt-oss y compte) |
+| `BEDROCK_TOOL_CHOICE` | `forced` | `forced` ou `auto`, si le modèle refuse de se voir imposer un tool |
+| `BEDROCK_MAX_PER_MINUTE` | `30` | plafond d'appels par minute (Bedrock) |
+
+Une variable d'environnement reste prioritaire sur le fichier `.env`.
 
 | Route | Contenu |
 |---|---|
 | `GET /api/analyse/assistant` | `{"enabled": true\|false}` : assistant configuré ou non |
 
 La réponse de `GET /api/analyse?q=...` indique `interpretation.source` (`KEYWORDS` ou `ASSISTANT`) et
-`interpretation.understoodAs`. Évaluation réelle (payante, moins d'un centime) :
-`ANTHROPIC_API_KEY=... ./mvnw -pl backend test -Dtest=AssistantEvalTest -Danalyse.assistant.eval=true`.
+`interpretation.understoodAs`. Évaluation réelle (50 requêtes) :
+`LLM_KEY=... ./mvnw -pl backend test -Dtest=AssistantEvalTest -Danalyse.assistant.eval=true
+-Danalyse.assistant.eval.pause-seconds=62` (le quota du proxy impose cette pause : près d'une heure).
 
 ## Build et lancement
 

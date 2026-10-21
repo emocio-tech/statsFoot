@@ -1,40 +1,105 @@
 package com.emocio.analysefoot.analyse;
 
-import com.anthropic.client.okhttp.AnthropicOkHttpClient;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.retry.support.RetryTemplate;
+import org.springframework.web.client.RestClient;
 
 import java.time.Clock;
 import java.time.Duration;
 
 /**
- * Assistant d'interprétation (tool Claude rank) : activé seulement si une clé {@code ANTHROPIC_API_KEY} est fournie.
- * Délai court et aucune nouvelle tentative : en cas d'échec, les mots-clés répondent.
+ * Assistant d'interprétation (tool rank) par le {@link ChatClient} de Spring AI, au choix du fournisseur
+ * {@code analyse.assistant.provider}. Les deux parlent le format OpenAI Chat Completions :
+ * <ul>
+ *   <li>{@code proxy} (défaut) : le LLM du projet, proxy de l'équipe, clé {@code LLM_KEY} ;</li>
+ *   <li>{@code bedrock} : Amazon Bedrock (modèle gpt-oss), jeton {@code AWS_BEARER_TOKEN_BEDROCK}.</li>
+ * </ul>
+ * Le client est construit ici et non par l'autoconfiguration de Spring AI, qui exigerait une clé au démarrage :
+ * sans clé, l'assistant est désactivé. Délai court, aucune nouvelle tentative : en cas d'échec, les mots-clés
+ * répondent.
  */
 @Configuration
 @EnableConfigurationProperties(AssistantConfig.Properties.class)
 public class AssistantConfig {
 
+    static final String BEDROCK = "bedrock";
+
     @ConfigurationProperties("analyse.assistant")
-    public record Properties(String apiKey, String model, Duration timeout, int maxPerMinute) {
+    public record Properties(String provider, String apiKey, String baseUrl, String model, Duration timeout,
+                             int maxPerMinute, int maxTokens, String toolChoice, Bedrock bedrock) {
+
+        /**
+         * Amazon Bedrock, interface compatible OpenAI ; {@code toolChoice} : {@code forced} ou {@code auto}. Un modèle à
+         * raisonnement compte ses jetons de réflexion dans {@code maxTokens}.
+         */
+        public record Bedrock(String apiKey, String baseUrl, String model, String toolChoice, int maxTokens,
+                              int maxPerMinute) {
+        }
+
+        boolean useBedrock() {
+            return BEDROCK.equalsIgnoreCase(provider) && bedrock != null;
+        }
     }
 
     @Bean
     QuestionInterpreter questionInterpreter(Properties properties) {
-        if (properties.apiKey() == null || properties.apiKey().isBlank()) {
+        boolean bedrock = properties.useBedrock();
+        String apiKey = bedrock ? properties.bedrock().apiKey() : properties.apiKey();
+        if (apiKey == null || apiKey.isBlank()) {
             return new DisabledQuestionInterpreter();
         }
-        return new ClaudeQuestionInterpreter(AnthropicOkHttpClient.builder()
-                .apiKey(properties.apiKey())
-                .timeout(properties.timeout())
-                .maxRetries(0)
-                .build(), properties.model());
+        String baseUrl = bedrock ? properties.bedrock().baseUrl() : properties.baseUrl();
+        String model = bedrock ? properties.bedrock().model() : properties.model();
+        int maxTokens = bedrock ? properties.bedrock().maxTokens() : properties.maxTokens();
+        String toolChoice = bedrock ? properties.bedrock().toolChoice() : properties.toolChoice();
+        return new SpringAiQuestionInterpreter(chatClient(baseUrl, apiKey, model, properties.timeout()),
+                options(model, maxTokens, bedrock, !"auto".equalsIgnoreCase(toolChoice)));
     }
 
     @Bean
     AssistantRateLimiter assistantRateLimiter(Properties properties) {
-        return new AssistantRateLimiter(properties.maxPerMinute(), Clock.systemUTC());
+        int max = properties.useBedrock() ? properties.bedrock().maxPerMinute() : properties.maxPerMinute();
+        return new AssistantRateLimiter(max, Clock.systemUTC());
+    }
+
+    /** Client Spring AI sans nouvelle tentative et avec les délais de connexion et de lecture demandés. */
+    static ChatClient chatClient(String baseUrl, String apiKey, String model, Duration timeout) {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(timeout);
+        requestFactory.setReadTimeout(timeout);
+        OpenAiApi api = OpenAiApi.builder()
+                .baseUrl(baseUrl)
+                .apiKey(apiKey)
+                .restClientBuilder(RestClient.builder().requestFactory(requestFactory))
+                .build();
+        OpenAiChatModel chatModel = OpenAiChatModel.builder()
+                .openAiApi(api)
+                .defaultOptions(OpenAiChatOptions.builder().model(model).build())
+                .retryTemplate(RetryTemplate.builder().maxAttempts(1).build())
+                .build();
+        return ChatClient.create(chatModel);
+    }
+
+    /**
+     * Options de l'appel : le tool rank imposé (ou laissé au choix du modèle), jamais exécuté par Spring AI. Le plafond
+     * de la réponse est {@code max_tokens} pour le proxy et {@code max_completion_tokens} pour Bedrock.
+     */
+    static OpenAiChatOptions options(String model, int maxTokens, boolean maxCompletionTokens, boolean forcedToolChoice) {
+        OpenAiChatOptions.Builder builder = OpenAiChatOptions.builder()
+                .model(model)
+                .toolCallbacks(SpringAiQuestionInterpreter.toolCallbacks())
+                .internalToolExecutionEnabled(false)
+                .toolChoice(forcedToolChoice
+                        ? OpenAiApi.ChatCompletionRequest.ToolChoiceBuilder.function(RankTool.NAME)
+                        : OpenAiApi.ChatCompletionRequest.ToolChoiceBuilder.AUTO);
+        return (maxCompletionTokens ? builder.maxCompletionTokens(maxTokens) : builder.maxTokens(maxTokens)).build();
     }
 }

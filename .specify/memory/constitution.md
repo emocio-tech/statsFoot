@@ -1,30 +1,14 @@
 <!--
 Sync Impact Report
-- Version change: 1.0.0 → 1.1.0 (MINOR : deux principes ajoutés, périmètre et règles de données
-  élargis d'après backend/src/main/resources/db/migration/cadrage.txt)
+- Version change: 1.1.0 → 1.1.2 (PATCH : clarifications, aucun principe ajouté ni retiré)
 - Modified principles:
-  - I. Schéma versionné par Flyway → I. Schéma versionné par Flyway et recopié dans
-    donneesStats.sql (référence : branche initDonneesNotation au lieu de main ; synchronisation
-    obligatoire avec donneesStats.sql ; place de la partie 6)
-  - II. Notation reproductible et explicable : inchangé sur le fond ; ajout du déterminisme des
-    stats fictives
-  - III. Tests sur une vraie base PostgreSQL : ajout des critères d'analyse et des vues
-  - IV. L'API REST est le seul contrat front/back : ajout de l'indicateur « données fictives »
-  - V. Simplicité et livrable unique : ajout de la branche unique et du SDK Anthropic comme seule
-    dépendance externe prévue
-- Added principles:
-  - VI. Données réelles, calculées ou fictives : toujours distinguées
-  - VII. Les chiffres viennent du SQL, jamais du modèle de langage
-- Added sections: aucune (Contraintes techniques et Flux de développement complétés)
-- Removed sections: aucune
-- Templates requiring updates:
-  - .specify/templates/plan-template.md : ✅ aucune modification (le « Constitution Check » lit
-    cette constitution à l'exécution)
-  - .specify/templates/spec-template.md : ✅ aucune modification
-  - .specify/templates/tasks-template.md : ✅ aucune modification
-- Follow-up TODOs:
-  - README : la constitution (IV) exige d'y lister toutes les routes ; GET /api/stats/players et
-    GET /api/stats/teams n'y figurent pas encore.
+  - V. Simplicité : la dépendance externe de l'assistant est Spring AI (spring-ai-openai, ChatClient), qui
+    remplace le SDK Anthropic ; client construit à la main, sans starter ni autoconfiguration
+  - VII. Les chiffres viennent du SQL : « le modèle de langage » n'est plus limité à l'API Claude (modèle du
+    projet, quel qu'il soit, proxy de l'équipe ou Amazon Bedrock) ; mêmes garanties
+- Added/removed sections: aucune
+- Templates requiring updates: aucun
+- Follow-up TODOs: aucun
 -->
 
 # Analyse Foot (statsFoot) Constitution
@@ -103,7 +87,8 @@ Justification : le découplage par DTO permet de faire évoluer le schéma sans 
   JAR exécutable qui sert le front et l'API.
 - Toute nouvelle dépendance, nouveau module, service externe ou couche d'abstraction DOIT être
   justifié par un besoin présent (YAGNI) dans le plan de la fonctionnalité. Seule dépendance
-  externe prévue à ce jour : le SDK Java Anthropic, pour le Tool de l'onglet Analyse.
+  externe prévue à ce jour : Spring AI (`spring-ai-openai`, `ChatClient`), pour le Tool de l'onglet Analyse ; le
+  client y est construit à la main, sans starter, pour que l'assistant reste désactivable sans clé.
 - Le code suit les conventions déjà en place (paquets `controller`, `service`, `repository`,
   `model`, `dto`, `importer` ; `core`, `features`, `shared` côté Angular) et réutilise
   l'existant (vues du tournoi, `stats-table`, `rating-badge`) avant d'ajouter du neuf.
@@ -134,7 +119,7 @@ toute analyse.
   Tool, le serveur MCP, l'API et l'interface DOIVENT tous s'appuyer sur ce catalogue.
 - Chaque critère DOIT avoir une requête SQL sur les vues du tournoi et une règle d'égalité
   explicite ; les ex aequo DOIVENT être affichés, jamais cachés.
-- Le modèle de langage (API Claude, Tool `rank(criterion, scope)`) NE DOIT servir qu'à traduire
+- Le modèle de langage (Tool `rank(criterion, scope)` ; Claude ou un autre modèle du projet) NE DOIT servir qu'à traduire
   une question libre en critère du catalogue. Il NE DOIT produire aucune statistique.
 - L'application DOIT fonctionner sans clé d'API (reconnaissance par mots-clés et suggestions).
   La clé reste côté serveur, en variable d'environnement, et n'est jamais commitée.
@@ -193,4 +178,4 @@ peut inventer des chiffres.
   vérifier le respect des principes ; toute dérogation DOIT être justifiée dans la section
   « Complexity Tracking » du plan.
 
-**Version**: 1.1.0 | **Ratified**: 2026-10-20 | **Last Amended**: 2026-10-21
+**Version**: 1.1.2 | **Ratified**: 2026-10-20 | **Last Amended**: 2026-10-21
