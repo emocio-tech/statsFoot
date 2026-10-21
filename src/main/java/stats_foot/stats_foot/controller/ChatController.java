@@ -28,6 +28,8 @@ public class ChatController {
               clearly. Never guess, estimate or invent anything.
             - Before talking about a player, call searchPlayers to get his id, then
               getPlayerProfile for his stats. If several players match, ask the user which one.
+            - To list or rank players by an attribute (team, captain, goals, cards...), call
+              findPlayers instead of searching them one by one.
             - You have no tool for teams or comparisons yet: if asked, say you cannot
               answer that yet. Do not answer from general knowledge.
             - Stay on World Cup 2026. Politely decline other competitions or years.
