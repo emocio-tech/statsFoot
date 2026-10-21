@@ -1,0 +1,41 @@
+<article class="card">
+  <h2 data-testid="name">{{ profile().name }}</h2>
+
+  <section>
+    <h3>Identity</h3>
+    <dl>
+      <dt>Team</dt><dd data-testid="team">{{ profile().teamName }} ({{ profile().teamCode }})</dd>
+      <dt>Shirt number</dt><dd data-testid="shirtNumber">{{ profile().shirtNumber }}</dd>
+      <dt>Position</dt><dd data-testid="position">{{ profile().position }}</dd>
+      <dt>Position detail</dt><dd data-testid="positionDetail">{{ profile().positionDetail }}</dd>
+      <dt>Date of birth</dt><dd data-testid="birthDate">{{ profile().birthDate }}</dd>
+      <dt>Age</dt><dd data-testid="age">{{ profile().age }}</dd>
+      <dt>Club</dt><dd data-testid="club">{{ profile().club }}</dd>
+      <dt>Height</dt><dd data-testid="height">{{ profile().heightCm }} cm</dd>
+      <dt>Preferred foot</dt><dd data-testid="preferredFoot">{{ profile().preferredFoot }}</dd>
+      <dt>Captain</dt><dd data-testid="captain">{{ profile().captain ? 'yes' : 'no' }}</dd>
+    </dl>
+  </section>
+
+  <section>
+    <h3>Statistics</h3>
+    <dl>
+      @for (line of statLines; track line.key) {
+        <dt [attr.data-testid]="'stat-label-' + line.key">{{ line.label }}</dt>
+        <dd [attr.data-testid]="'stat-' + line.key">{{ display(profile().stats[line.key]) }}</dd>
+      }
+    </dl>
+  </section>
+
+  @if (profile().goalkeeperStats; as gk) {
+    <section data-testid="goalkeeper-block">
+      <h3>Goalkeeper statistics</h3>
+      <dl>
+        <dt>Saves</dt><dd data-testid="gk-saves">{{ display(gk.saves) }}</dd>
+        <dt>Goals conceded</dt><dd data-testid="gk-goalsConceded">{{ display(gk.goalsConceded) }}</dd>
+        <dt>Clean sheets</dt><dd data-testid="gk-cleanSheets">{{ display(gk.cleanSheets) }}</dd>
+        <dt>Penalties saved</dt><dd data-testid="gk-penaltiesSaved">{{ display(gk.penaltiesSaved) }}</dd>
+      </dl>
+    </section>
+  }
+</article>
