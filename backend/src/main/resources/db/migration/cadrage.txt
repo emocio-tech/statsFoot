@@ -147,7 +147,7 @@ Déjà en place, à réutiliser :
 ------------------------
 
   Onglet Analyse (Angular, nouvel onglet à côté de Joueurs et Équipes)
-    barre de recherche + 8 suggestions cliquables
+    barre de recherche ; suggestions cliquables seulement si la question n est pas trouvée
           |  POST /api/analyse { question }
           v
   Backend Spring (nouveau AnalyseController + AnalyseService)
@@ -278,7 +278,9 @@ Rapport équipe :
 5. INTERFACE DE L'ONGLET ANALYSE
 --------------------------------
 
-  - Une barre de recherche, avec les 8 questions proposées en suggestions.
+  - Une barre de recherche seule par défaut : les questions du catalogue ne sont proposées en
+    suggestions que lorsque la question saisie n'est pas trouvée (les 8) ou est ambiguë (celles
+    concernées).
   - Une réponse en titre, par exemple "Kylian Mbappé, 10 buts".
   - Une ligne qui explique le critère appliqué, par exemple "Critère : buts hors
     csc ; égalité départagée par les minutes jouées".

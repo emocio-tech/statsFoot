@@ -1,6 +1,7 @@
 package com.emocio.analysefoot.analyse;
 
 import com.emocio.analysefoot.dto.AnalyseAnswer;
+import com.emocio.analysefoot.dto.RankedEntry;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
@@ -37,7 +38,12 @@ class AnalyseServiceAssistantTest {
 
     private static AnalyseService service(QuestionInterpreter interpreter, int maxPerMinute) {
         return new AnalyseService(null, new QuestionMatcher(), interpreter,
-                new AssistantRateLimiter(maxPerMinute, Clock.systemUTC()));
+                new AssistantRateLimiter(maxPerMinute, Clock.systemUTC())) {
+            @Override
+            List<RankedEntry> entityNames(AnalyseCriterion.Scope scope) {
+                return List.of();
+            }
+        };
     }
 
     private static Interpretation recognized(AnalyseCriterion criterion) {

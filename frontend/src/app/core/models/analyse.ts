@@ -2,7 +2,7 @@ import { Stage } from './rating';
 
 export type AnalyseScope = 'PLAYER' | 'TEAM';
 
-export type AnalyseStatus = 'ANSWERED' | 'AMBIGUOUS' | 'NOT_RECOGNIZED' | 'NO_DATA';
+export type AnalyseStatus = 'ANSWERED' | 'AMBIGUOUS' | 'NOT_RECOGNIZED' | 'NO_DATA' | 'FOUND' | 'CHOOSE';
 
 /** Une question du catalogue de l'onglet Analyse. */
 export interface AnalyseQuestion {

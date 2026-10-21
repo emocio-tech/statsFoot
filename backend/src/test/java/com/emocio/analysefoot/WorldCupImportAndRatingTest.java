@@ -418,6 +418,22 @@ class WorldCupImportAndRatingTest {
         }
 
         @Test
+        void searchByNameFindsPlayerAndTeamIgnoringCase() {
+            AnalyseAnswer player = analyseService.answer("a1");
+            assertThat(player.status()).isEqualTo("FOUND");
+            assertThat(player.top().getFirst().scope()).isEqualTo("PLAYER");
+            assertThat(player.top().getFirst().name()).isEqualTo("A1");
+
+            String team = jdbc.sql("SELECT team FROM v_player_tournament_stats WHERE player = 'A1'").query(String.class).single();
+            AnalyseAnswer byTeam = analyseService.answer(team.toUpperCase());
+            assertThat(byTeam.status()).isEqualTo("FOUND");
+            assertThat(byTeam.top().getFirst().scope()).isEqualTo("TEAM");
+            assertThat(byTeam.top().getFirst().name()).isEqualTo(team);
+
+            assertThat(analyseService.answer("zzzzzz").status()).isEqualTo("NOT_RECOGNIZED");
+        }
+
+        @Test
         void topScorerTieGoesToFewerMinutes() {
             setPlayerTotal("goals", "B2", 3);
             assertThat(ranks(answer(AnalyseCriterion.TOP_SCORER))).startsWith("1:B2", "2:A1");

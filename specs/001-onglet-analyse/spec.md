@@ -25,14 +25,19 @@
   les équipes par position finale (FR-003).
 - Q: Les critères de fair-play utilisent-ils les points FIFA ? → A: oui, pour le joueur et
   pour l'équipe (jaune -1, deuxième jaune -3 au total, rouge direct -4) (FR-003).
+- Q: Les huit questions sont-elles affichées par défaut ? → A: non (révisé le 21/10/2026) : l'onglet
+  n'affiche que la barre de recherche ; les questions du catalogue ne sont proposées que lorsque la
+  question saisie n'est pas trouvée ou est ambiguë (FR-001).
 
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Répondre aux questions proposées (Priority: P1)
 
-Un visiteur ouvre l'onglet Analyse et voit huit questions proposées : meilleur buteur,
-meilleur passeur, joueur le plus agressif, joueur le moins fair-play, meilleure équipe,
-équipe qui a marqué le plus de buts, équipe la moins fair-play, joueur le plus fair-play.
+Un visiteur ouvre l'onglet Analyse : seule la barre de recherche est affichée. Il tape sa question ;
+si elle n'est pas trouvée ou est ambiguë, l'onglet lui propose les questions possibles : meilleur
+buteur, meilleur passeur, joueur le plus agressif, joueur le moins fair-play, meilleure équipe,
+équipe qui a marqué le plus de buts, équipe la moins fair-play, joueur le plus fair-play (toutes les
+huit si la question n'est pas reconnue, les deux ou trois concernées si elle est ambiguë).
 Il clique sur l'une d'elles. Il obtient en titre le joueur ou l'équipe qui répond, avec la
 valeur qui le justifie (par exemple « Kylian Mbappé, 10 buts »), une phrase qui explique le
 critère appliqué et la façon dont les égalités sont départagées, les éventuels ex aequo, et
@@ -153,8 +158,13 @@ question hors sujet, et vérifier la réponse ou la liste des questions disponib
 
 ### Functional Requirements
 
-- **FR-001**: L'onglet Analyse MUST proposer les huit questions du cadrage sous forme de
-  suggestions cliquables.
+- **FR-001**: L'onglet Analyse MUST n'afficher que la barre de recherche par défaut, et proposer les
+  questions du cadrage sous forme de suggestions cliquables seulement lorsque la question saisie n'est
+  pas trouvée (les huit questions) ou est ambiguë (les questions concernées).
+- **FR-001b**: La barre de recherche MUST aussi accepter le nom d'un joueur (nom et/ou prénom, dans
+  n'importe quel ordre, accents et casse ignorés) ou l'appellation d'une équipe ; quand la saisie n'est
+  pas une question du catalogue, le rapport complet (toutes les statistiques) du joueur ou de l'équipe
+  trouvé s'affiche, ou une liste à départager s'il y a plusieurs correspondances.
 - **FR-002**: Chaque réponse MUST comporter le joueur ou l'équipe désigné, la valeur qui le
   justifie, une phrase expliquant le critère et sa règle de départage, les ex aequo éventuels,
   et le classement des cinq premiers.

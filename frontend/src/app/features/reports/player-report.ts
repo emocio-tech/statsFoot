@@ -148,9 +148,12 @@ export class PlayerReport {
       stat('Minutes', 'minutesPlayed'),
       stat('Buts', 'goals'),
       stat('dont penalties', 'penaltyGoals'),
+      stat('Buts contre son camp', 'ownGoals'),
       stat('Buts décisifs', 'decisiveGoals'),
       stat('Passes décisives', 'assists'),
       stat('Cartons jaunes', 'yellowCards'),
+      stat('Doubles jaunes', 'secondYellows'),
+      stat('Rouges directs', 'directReds'),
       stat('Cartons rouges', 'redCards'),
       stat('Points de fair-play', 'fairPlayPoints'),
       stat('Fautes commises', 'foulsCommitted'),
@@ -163,6 +166,7 @@ export class PlayerReport {
       stat('Distance', 'distanceKm', ' km'),
       stat('Homme du match', 'manOfTheMatchCount'),
       stat('Note moyenne', 'rating'),
+      stat('Note pondérée', 'ratingWeighted'),
     ];
   });
 }

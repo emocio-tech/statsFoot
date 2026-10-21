@@ -19,6 +19,7 @@ import java.util.List;
 public class AnalyseService {
 
     static final int TOP = 5;
+    static final int MAX_FOUND = 10;
 
     private final JdbcClient jdbcClient;
     private final QuestionMatcher questionMatcher;
@@ -43,6 +44,14 @@ public class AnalyseService {
 
     /** Question libre : mots-clés d'abord, assistant (tool Claude rank) seulement s'ils échouent, puis réponse. */
     public AnalyseAnswer answer(String question) {
+        QuestionMatcher.Match match = questionMatcher.match(question);
+        if (!match.recognized() && !match.ambiguous()) {
+            List<RankedEntry> found = findEntities(question);
+            if (!found.isEmpty()) {
+                return new AnalyseAnswer(found.size() == 1 ? "FOUND" : "CHOOSE", null, null, false, List.of(), found,
+                        List.of(), new AnalyseInterpretation("KEYWORDS", null));
+            }
+        }
         Interpretation interpretation = resolve(question);
         return switch (interpretation.outcome()) {
             case RECOGNIZED -> answer(interpretation.criterion(), new AnalyseInterpretation(
@@ -53,6 +62,46 @@ public class AnalyseService {
             case NONE -> new AnalyseAnswer("NOT_RECOGNIZED", null, null, false, List.of(), List.of(), questions(),
                     new AnalyseInterpretation(interpretation.source().name(), null));
         };
+    }
+
+    /**
+     * Recherche par nom : un joueur (nom et/ou prénom, dans n'importe quel ordre, accents et casse ignorés) ou une
+     * équipe (appellation). Chaque mot saisi doit commencer un mot du nom. Un nom complet exact l'emporte sur les
+     * correspondances partielles ; au plus {@value #MAX_FOUND} résultats.
+     */
+    List<RankedEntry> findEntities(String question) {
+        String query = QuestionMatcher.normalize(question);
+        if (query.length() < 2) {
+            return List.of();
+        }
+        List<String> words = Arrays.asList(query.split(" "));
+        List<RankedEntry> teams = namesMatching(AnalyseCriterion.Scope.TEAM, query, words);
+        List<RankedEntry> players = namesMatching(AnalyseCriterion.Scope.PLAYER, query, words);
+        List<RankedEntry> found = new java.util.ArrayList<>(teams);
+        found.addAll(players);
+        List<RankedEntry> exact = found.stream()
+                .filter(e -> QuestionMatcher.normalize(e.name()).equals(query)).toList();
+        List<RankedEntry> result = exact.isEmpty() ? found : exact;
+        return result.size() > MAX_FOUND ? result.subList(0, MAX_FOUND) : result;
+    }
+
+    private List<RankedEntry> namesMatching(AnalyseCriterion.Scope scope, String query, List<String> words) {
+        return entityNames(scope).stream()
+                .filter(e -> {
+                    List<String> nameWords = Arrays.asList(QuestionMatcher.normalize(e.name()).split(" "));
+                    return words.stream().allMatch(w -> nameWords.stream().anyMatch(n -> n.equals(w)
+                            || (w.length() >= 3 && n.startsWith(w))));
+                })
+                .toList();
+    }
+
+    /** Tous les joueurs ou toutes les équipes de la dernière compétition importée. */
+    List<RankedEntry> entityNames(AnalyseCriterion.Scope scope) {
+        return jdbcClient.sql("SELECT DISTINCT %s AS id, %s AS name, %s AS team FROM %s WHERE competition_id = (SELECT MAX(id) FROM competition) ORDER BY name"
+                        .formatted(scope.idColumn, scope.nameColumn, scope.teamColumn, scope.view))
+                .query((rs, rowNum) -> new RankedEntry(1, scope.name(), rs.getInt("id"), rs.getString("name"),
+                        rs.getString("team"), null, "", null, null))
+                .list();
     }
 
     /**

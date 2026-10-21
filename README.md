@@ -89,7 +89,7 @@ F=backend/src/main/resources/db/migration/donneesStats.sql
 | `GET /api/stats/teams` | totaux du tournoi par équipe (onglet Équipes) ; `fictitiousFields` liste les champs fictifs |
 | `GET /api/analyse/questions` | les 8 questions de l'onglet Analyse |
 | `GET /api/analyse/{questionId}` | réponse à une question : gagnants (ex aequo compris), critère, top 5 |
-| `GET /api/analyse?q=...` | question libre, reconnue par mots-clés (reconnue, ambiguë ou non reconnue) |
+| `GET /api/analyse?q=...` | question libre (reconnue, ambiguë ou non reconnue) ou nom d'un joueur (nom et/ou prénom) ou d'une équipe : statut `FOUND` (une correspondance, dans `top`) ou `CHOOSE` (plusieurs, à départager) ; l'interface affiche alors le rapport complet |
 | `GET /api/players/{id}/report` | rapport complet d'un joueur, dont son rang sur chaque critère |
 | `GET /api/teams/{id}/report` | rapport complet d'une équipe : parcours, position finale, effectif |
 

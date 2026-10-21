@@ -49,6 +49,11 @@ Attendu : tous les tests passent, dont ceux qui :
 
 ## 3. Parcours manuel (http://localhost:8080/analyse)
 
+À l'ouverture, seule la barre de recherche est visible : aucune question n'est affichée. Pour obtenir les
+huit questions, saisir une question non reconnue (par exemple « ? » ou « bonjour ») : l'onglet répond
+« Question non reconnue » et propose les huit questions, sur lesquelles cliquer. Une question ambiguë
+(« le moins fair-play ») ne propose que les questions concernées.
+
 | Action | Résultat attendu |
 |--------|------------------|
 | Clic « Meilleur buteur » | Kylian Mbappé, 10 buts ; top 5 avec Haaland (476 min) devant Bellingham (616 min) |
