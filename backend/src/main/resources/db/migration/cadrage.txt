@@ -1,0 +1,311 @@
+CADRAGE - ONGLET "ANALYSE" (statsFoot)
+=======================================
+
+Objet : permettre à l'utilisateur de poser une question dans une barre de recherche
+(meilleur buteur, équipe la moins fair-play...) et d'obtenir un rapport complet sur
+le joueur ou l'équipe concerné.
+
+Périmètre (mise à jour du 21/10/2026) : tout le travail se fait sur la seule branche
+initDonneesNotation, et la seule source de données est donneesStats.sql, appliqué à
+la base PostgreSQL analysefoot. Aucune autre branche, aucun fichier JSON de data/.
+
+Constat : sur les 8 questions demandées, 5 doivent encore être précisées avant
+développement. Une reste impossible (aucune donnée de passe), une est contradictoire,
+et trois donnent des égalités ou presque aucun résultat. Les stats détaillées de
+donneesStats.sql permettent de départager certaines égalités, mais elles sont
+FICTIVES.
+Les chiffres ci-dessous ont été vérifiés le 21/10/2026 sur la base analysefoot,
+dans les vues v_player_tournament_stats et v_team_tournament_stats (104 matchs,
+1 039 joueurs entrés en jeu).
+
+
+0. POINT DE DÉPART : LA BRANCHE initDonneesNotation
+---------------------------------------------------
+
+Pile technique :
+  - backend Spring Boot 3.5 (Java 25), accès aux données en SQL direct (JdbcClient) ;
+  - frontend Angular 20, embarqué dans le jar du backend (un seul livrable) ;
+  - PostgreSQL 17, schéma géré par Flyway : V1 (compétitions), V2 (notes),
+    V3 (stats détaillées et vues du tournoi).
+
+donneesStats.sql (backend/src/main/resources/db/migration) : synthèse du modèle et
+script autonome, en 6 parties.
+  1. Schéma des compétitions (copie de V1).
+  2. Tables de notes (copie de V2).
+  3. Calcul des notes de 0 à 10, barème v1 (copie du skill notation-matchs).
+  4. Tables de stats détaillées player_match_stats et team_match_stats (V3).
+  5. Vues v_player_tournament_stats et v_team_tournament_stats (V3).
+  6. Génération des stats détaillées FICTIVES.
+  Règle : toute nouvelle migration (V4...) est recopiée dans donneesStats.sql, et la
+  partie 6 reste la dernière, puisqu'elle lit les notes.
+
+Données :
+  - Réelles (worldcup-full.json) : matchs, scores (90 min, prolongation, tirs au
+    but), feuilles de match, remplacements, buts (penalty, contre son camp),
+    cartons (Y, R, Y/R), séances de tirs au but.
+  - Calculées (partie 3) : note par joueur et par équipe pour chaque match,
+    minutes jouées, buts décisifs, points de fair-play FIFA de l'équipe.
+  - FICTIVES (partie 6) : fautes, coups francs obtenus et concédés, duels gagnés et
+    perdus, corners, hors-jeu, distance, homme du match. Elles sont cohérentes avec
+    les matchs (temps de jeu, prolongations, au moins une faute par carton, duels
+    gagnés = duels perdus de l'adversaire), mais inventées. Tout critère qui les
+    utilise doit le signaler à l'écran.
+  - Absentes : passes, passes décisives, tirs, arrêts, postes des joueurs (seuls
+    les gardiens sont déduits de la feuille de match, dans la partie 6).
+
+Déjà en place, à réutiliser :
+  - routes GET /api/matches, /api/matches/{id}/ratings, /api/rankings/players,
+    /api/rankings/teams, /api/stats/players, /api/stats/teams ;
+  - onglets Matchs (avec le détail des notes d'un match), Classements, Joueurs et
+    Équipes ;
+  - composant de tableau triable (shared/stats-table.ts) et pastille de note
+    (shared/rating-badge.ts) ;
+  - hook Git pre-commit (.githooks) qui lance les tests du backend ;
+  - tests d'intégration sur worldcup-sample.json, avec la base de test
+    analysefoot_test.
+
+
+1. LES 8 QUESTIONS CONFRONTÉES AUX DONNÉES
+------------------------------------------
+
+1) Meilleur buteur
+   Critère demandé : le plus de buts.
+   Données         : Mbappé 10, Messi 8, Haaland et Bellingham 7.
+   Critère proposé : buts hors but contre son camp (colonne goals) ; en cas
+                     d'égalité, celui qui a joué le moins de minutes (Haaland
+                     476 min devant Bellingham 616 min).
+
+2) Meilleur passeur
+   Critère demandé : le plus de passes.
+   Données         : IMPOSSIBLE. donneesStats.sql ne contient ni passes ni passes
+                     décisives, pas même dans les stats fictives.
+   Proposition     : répondre "donnée non disponible", ou ajouter des passes
+                     fictives à la partie 6 (et à la table player_match_stats par
+                     une migration V4).
+
+3) Joueur le plus agressif
+   Critère demandé : le plus de cartons jaunes.
+   Données         : 1 joueur à 3 jaunes (Issa Diop, Maroc), 31 joueurs à 2.
+   Critère proposé : conservé ; en cas d'égalité, le plus de jaunes par 90 minutes
+                     jouées.
+   Variante        : départager par les fautes commises (Cristian Romero, 11
+                     fautes, en tête des joueurs à 2 jaunes). Donnée fictive.
+
+4) Joueur le moins fair-play
+   Critère demandé : le plus de cartons rouges.
+   Données         : 15 joueurs à égalité avec 1 exclusion chacun (13 rouges
+                     directs et 2 deuxièmes jaunes ; la vue compte les deux dans
+                     red_cards).
+   Critère proposé : points de fair-play FIFA par joueur (jaune -1, deuxième
+                     jaune -3, rouge direct -4) ; en cas d'égalité, le moins de
+                     minutes jouées.
+   À noter         : ces points n'existent qu'au niveau de l'équipe
+                     (fair_play_points). Il faut les ajouter à la vue joueur (V4).
+
+5) Meilleure équipe
+   Critère demandé : non défini.
+   Critère proposé : note moyenne (colonne rating) : Espagne 8,9, puis Argentine
+                     et Mexique 8,1. Alternative : le champion (dernier tour
+                     atteint, à ajouter à la vue équipe).
+
+6) Équipe qui a marqué le plus de buts
+   Critère demandé : le plus de buts.
+   Données         : France et Angleterre à égalité, 20 buts chacune.
+   Critère proposé : en cas d'égalité, la meilleure différence de buts. La France
+                     l'emporte (+10 contre +8).
+
+7) Équipe la moins fair-play
+   Critère demandé : le plus de cartons Y/R (deuxième jaune).
+   Données         : seulement 2 cartons Y/R dans tout le tournoi (Argentine,
+                     Suisse).
+   Critère proposé : total des points de fair-play FIFA de l'équipe : Argentine
+                     -16, puis Paraguay et Afrique du Sud -13.
+   Variante        : départager par les fautes commises (Paraguay 62 contre
+                     Afrique du Sud 41). Donnée fictive.
+
+8) Joueur le plus fair-play
+   Critère demandé : "le plus de cartons Y/R", avec un rapport sur l'équipe.
+   Données         : CONTRADICTOIRE. Le plus de cartons désigne le moins
+                     fair-play, et la question porte sur un joueur, pas sur une
+                     équipe.
+   Critère proposé : le joueur sans aucun carton qui a joué le plus de minutes
+                     (46 joueurs ont joué au moins 450 minutes sans carton).
+                     Rapport sur le joueur.
+   Problème        : ce critère désigne des gardiens (Emiliano Martinez 810 min,
+                     Unai Simon 750 min). En excluant les gardiens, c'est Lionel
+                     Messi (740 min). Il faut décider si les gardiens comptent ;
+                     l'indicateur gardien est à ajouter à la vue joueur (V4).
+
+
+2. ARCHITECTURE PROPOSÉE
+------------------------
+
+  Onglet Analyse (Angular, nouvel onglet à côté de Joueurs et Équipes)
+    barre de recherche + 8 suggestions cliquables
+          |  POST /api/analyse { question }
+          v
+  Backend Spring (nouveau AnalyseController + AnalyseService)
+    1. Comprendre la question -> un des critères du catalogue   <- Tool (API Claude)
+                                                                   ou mots-clés
+    2. Classement SQL sur les vues de donneesStats.sql          <- v_player_tournament_stats
+                                                                   v_team_tournament_stats
+    3. Construction du rapport complet (joueur ou équipe)
+          |
+          v
+  { critère, explication, données fictives oui/non, top 5 avec ex aequo, rapport }
+
+Principe : un seul catalogue des critères, défini côté backend. Le Tool, le serveur
+MCP, l'API et l'interface s'appuient tous dessus. Ajouter une question revient à
+ajouter une entrée au catalogue, avec sa requête SQL sur les vues. Chaque entrée
+indique si elle repose sur des données fictives.
+
+Les rapports joueur et équipe servent aussi aux onglets existants : un clic sur une
+ligne des onglets Joueurs ou Équipes ouvre le même rapport.
+
+
+3. RÔLE DE CHAQUE BRIQUE
+------------------------
+
+TOOL (tool use de l'API Claude, appelé par le backend)
+  - Un seul outil : rank(criterion, scope).
+      criterion : liste fermée (TOP_SCORER, MOST_YELLOW_CARDS, LEAST_FAIR_PLAY,
+                  BEST_TEAM...).
+      scope     : player ou team.
+  - Claude ne fait que traduire la question libre en critère. Il ne calcule rien :
+    les chiffres viennent toujours du SQL, donc il ne peut pas inventer de
+    statistiques.
+  - Modèle conseillé : Haiku (claude-haiku-5-5), suffisant pour reconnaître une
+    question parmi un catalogue fermé. La clé d'API reste côté serveur, dans une
+    variable d'environnement, comme les accès à la base (DB_URL...).
+  - La branche n'a encore aucun client pour l'API Claude : ajouter le SDK Java
+    Anthropic au backend.
+  - Sans clé d'API : reconnaissance par mots-clés ("buteur", "jaune",
+    "fair-play"...). Les 8 suggestions cliquables fonctionnent toujours.
+
+MCP N°1 : "statsfoot" (métier, lecture seule)
+  - Expose à Claude Code et Claude Desktop les mêmes fonctions que l'API :
+    rank, player_report, team_report.
+  - Permet à l'équipe d'interroger les statistiques en langage naturel pendant le
+    développement, et de vérifier les rapports produits par l'onglet.
+
+MCP N°2 : PostgreSQL (développement, lecture seule)
+  - Serveur MCP PostgreSQL connecté avec un rôle en lecture seule, pour explorer
+    la base analysefoot et mettre au point les requêtes des nouveaux critères.
+  - Jamais d'accès en écriture : le schéma reste géré par Flyway, et les stats
+    fictives par la partie 6 de donneesStats.sql.
+
+SKILLS (Claude Code)
+  - notation-matchs (existant) : calcule les notes ; il fournit la note moyenne qui
+    désigne la meilleure équipe et qui apparaît dans les rapports.
+  - ajout-critere-analyse (à créer) : procédure de bout en bout pour ajouter une
+    question :
+      définir le critère et sa règle d'égalité ;
+      si besoin, compléter les vues par une migration et la recopier dans
+      donneesStats.sql ;
+      ajouter l'entrée au catalogue et la requête SQL ;
+      mettre à jour la description de l'outil, ajouter la suggestion dans
+      l'interface et le test sur worldcup-sample.json.
+  - rapport-analyse (optionnel) : produit un rapport rédigé, par exemple en
+    Markdown, à partir du MCP statsfoot, pour présenter les résultats.
+
+HOOKS
+  - Git pre-commit (existant) : lance les tests du backend. À compléter par le
+    build Angular, puisque le frontend est embarqué dans le jar.
+  - Claude Code PreToolUse : refuser toute modification d'une migration Flyway
+    déjà appliquée (V1, V2, V3). Les changements de schéma passent par une
+    nouvelle migration, recopiée dans donneesStats.sql.
+  - Test de cohérence (lancé par le hook de tests) : vérifier que chaque critère
+    du catalogue a bien sa requête SQL, sa description dans l'outil et son
+    libellé dans l'interface, et que chaque migration figure dans
+    donneesStats.sql.
+
+
+4. DONNÉES ET API
+-----------------
+
+Existant (V3, parties 4 et 5 de donneesStats.sql) :
+  - v_player_tournament_stats : matchs joués et titularisations, minutes, buts,
+    penalties, buts contre son camp, jaunes, rouges (directs et deuxièmes
+    jaunes), fautes, coups francs obtenus et concédés, duels gagnés et perdus,
+    corners, hors-jeu, distance, homme du match, note moyenne et note pondérée
+    par les minutes.
+  - v_team_tournament_stats : matchs, victoires, nuls, défaites, points, buts
+    marqués et encaissés, jaunes, rouges, points de fair-play, mêmes stats
+    détaillées que les joueurs, note moyenne.
+  - Une ligne par compétition : filtrer sur competition_id.
+
+À ajouter (migration V4, recopiée dans donneesStats.sql) :
+  - joueur : points de fair-play FIFA, deuxièmes jaunes séparés des rouges
+    directs, buts décisifs (présents par match dans player_match_rating),
+    indicateur gardien (règle de la partie 6, à rendre permanente) ;
+  - équipe : dernier tour atteint ;
+  - ratios par 90 minutes, utiles pour départager les égalités.
+  Ces vues restent la source unique pour l'API, l'outil et le MCP.
+
+Routes à créer :
+  - POST /api/analyse                : répond à une question.
+  - GET  /api/players/{id}/report    : rapport joueur.
+  - GET  /api/teams/{id}/report      : rapport équipe.
+
+Rapport joueur :
+  - identité, équipe, matchs joués, minutes ;
+  - buts, penalties, buts décisifs, cartons, fair-play ;
+  - stats détaillées (fautes, duels, distance, homme du match), signalées comme
+    fictives ;
+  - note moyenne, note de chaque match (lien vers le détail du match) et meilleur
+    match ;
+  - rang du joueur sur chaque critère.
+
+Rapport équipe :
+  - parcours match par match, avec scores et notes ;
+  - points, buts marqués et encaissés, fair-play, note moyenne ;
+  - stats détaillées de l'équipe, signalées comme fictives ;
+  - effectif avec les statistiques de chaque joueur, meilleur buteur et meilleur
+    joueur selon la note.
+
+
+5. INTERFACE DE L'ONGLET ANALYSE
+--------------------------------
+
+  - Une barre de recherche, avec les 8 questions proposées en suggestions.
+  - Une réponse en titre, par exemple "Kylian Mbappé, 10 buts".
+  - Une ligne qui explique le critère appliqué, par exemple "Critère : buts hors
+    csc ; égalité départagée par les minutes jouées".
+  - Une mention "données fictives" dès qu'un critère ou une égalité utilise les
+    stats détaillées.
+  - Les éventuels ex aequo, affichés et non cachés.
+  - Le rapport complet en dessous, puis le top 5 pour situer le résultat (avec le
+    tableau triable déjà utilisé par les onglets Joueurs et Équipes).
+  - Une question non reconnue affiche les questions disponibles.
+    "Meilleur passeur" affiche "donnée non disponible".
+
+
+6. ÉTAPES DE RÉALISATION (commits successifs sur initDonneesNotation)
+---------------------------------------------------------------------
+
+  1. Migration V4 : compléments des vues, recopiés dans donneesStats.sql ; tests
+     sur worldcup-sample.json.
+  2. Rapports joueur et équipe : routes, puis ouverture depuis les onglets Joueurs
+     et Équipes.
+  3. Catalogue des critères et POST /api/analyse, avec la reconnaissance par
+     mots-clés.
+  4. Onglet Analyse.
+  5. Tool Claude (SDK Anthropic), en complément des mots-clés.
+  6. Skill ajout-critere-analyse, hooks (build Angular, protection des
+     migrations), puis MCP statsfoot en dernier.
+  Chaque étape garde les tests au vert : le hook pre-commit bloque sinon.
+
+
+7. DÉCISIONS À PRENDRE AVANT DE COMMENCER
+-----------------------------------------
+
+  1. Meilleur passeur : générer des passes fictives dans donneesStats.sql, ou
+     retirer la question pour l'instant ?
+  2. Quatre critères à valider : la définition de la meilleure équipe, les deux
+     critères de fair-play (points FIFA plutôt que nombre de rouges ou de Y/R) et
+     la règle pour le joueur le plus fair-play (gardiens inclus ou non).
+  3. Stats fictives : peut-on s'en servir pour départager des égalités ou pour
+     de nouvelles questions (homme du match, distance), à condition de le
+     signaler ?
+  4. Appel à l'API Claude : l'accepter côté backend (clé d'API, coût, données
+     envoyées) ou s'en tenir aux mots-clés et aux suggestions ?
