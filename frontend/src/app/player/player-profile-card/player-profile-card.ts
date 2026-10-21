@@ -15,20 +15,25 @@ export class PlayerProfileCard {
   readonly profile = input.required<PlayerProfile>();
 
   readonly statLines: StatLine[] = [
-    { key: 'appearances', label: 'Appearances' },
-    { key: 'starts', label: 'Starts' },
+    { key: 'matchesPlayed', label: 'Matches played' },
+    { key: 'matchesStarted', label: 'Matches started' },
     { key: 'minutesPlayed', label: 'Minutes played' },
     { key: 'goals', label: 'Goals' },
-    { key: 'assists', label: 'Assists' },
+    { key: 'penaltyGoals', label: 'Penalty goals' },
     { key: 'ownGoals', label: 'Own goals' },
-    { key: 'shots', label: 'Shots' },
-    { key: 'shotsOnTarget', label: 'Shots on target' },
     { key: 'yellowCards', label: 'Yellow cards' },
     { key: 'redCards', label: 'Red cards' },
     { key: 'foulsCommitted', label: 'Fouls committed' },
-    { key: 'foulsSuffered', label: 'Fouls suffered' },
-    { key: 'passes', label: 'Passes' },
-    { key: 'passAccuracy', label: 'Pass accuracy' },
+    { key: 'freeKicksWon', label: 'Free kicks won' },
+    { key: 'freeKicksConceded', label: 'Free kicks conceded' },
+    { key: 'duelsWon', label: 'Duels won' },
+    { key: 'duelsLost', label: 'Duels lost' },
+    { key: 'corners', label: 'Corners' },
+    { key: 'offsides', label: 'Offsides' },
+    { key: 'distanceKm', label: 'Distance (km)' },
+    { key: 'manOfTheMatchCount', label: 'Man of the match' },
+    { key: 'rating', label: 'Rating' },
+    { key: 'ratingWeighted', label: 'Rating (weighted by minutes)' },
   ];
 
   display(value: number | null | undefined): string {

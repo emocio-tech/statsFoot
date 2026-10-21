@@ -26,7 +26,7 @@ public class PlayerController {
 	}
 
 	@GetMapping("/{id}")
-	public PlayerProfile getProfile(@PathVariable("id") String id) {
+	public PlayerProfile getProfile(@PathVariable("id") int id) {
 		return playerService.getProfile(id);
 	}
 

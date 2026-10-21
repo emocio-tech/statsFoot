@@ -2,47 +2,35 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { PlayerProfileCard } from './player-profile-card';
 import { PlayerProfile } from '../player.models';
 
-const GOALKEEPER: PlayerProfile = {
-  id: 'P-0001',
-  name: 'Sami Suzuki',
-  teamCode: 'ESP',
-  teamName: 'Spain',
-  shirtNumber: 1,
-  position: 'GK',
-  positionDetail: 'GK',
-  birthDate: '2006-11-03',
-  age: 19,
-  club: 'Club América',
-  heightCm: 190,
-  preferredFoot: 'right',
-  captain: false,
+// Shaped like the contract: id 1, goalkeeper.
+const RANGEL: PlayerProfile = {
+  id: 1,
+  name: 'Raul RANGEL',
+  teamCode: 'MEX',
+  teamName: 'Mexico',
+  goalkeeperMatches: 5,
+  captainMatches: 0,
   stats: {
-    appearances: 0, starts: 0, minutesPlayed: 0, goals: 0, assists: 0, ownGoals: 0,
-    shots: 0, shotsOnTarget: 0, yellowCards: 0, redCards: 0,
-    foulsCommitted: 0, foulsSuffered: 0, passes: 0, passAccuracy: null,
+    matchesPlayed: 5, matchesStarted: 5, minutesPlayed: 438, goals: 0, penaltyGoals: 0, ownGoals: 0,
+    yellowCards: 0, redCards: 0, foulsCommitted: 0, freeKicksWon: 0, freeKicksConceded: 0,
+    duelsWon: 5, duelsLost: 5, corners: 0, offsides: 0, distanceKm: 25.11, manOfTheMatchCount: 0,
+    rating: 6.9, ratingWeighted: 6.9,
   },
-  goalkeeperStats: { saves: 0, goalsConceded: 0, cleanSheets: 0, penaltiesSaved: 0 },
 };
 
-// Shaped like the contract: outfield player, captain, no goalkeeperStats key.
-const CAPTAIN: PlayerProfile = {
-  id: 'P-0005',
-  name: 'Sample Captain',
-  teamCode: 'ESP',
-  teamName: 'Spain',
-  shirtNumber: 10,
-  position: 'FW',
-  positionDetail: 'ST',
-  birthDate: '1998-05-17',
-  age: 28,
-  club: 'Sample Club',
-  heightCm: 181,
-  preferredFoot: 'left',
-  captain: true,
+// Shaped like the contract: id 316, no minutes played, null weighted rating.
+const WRIGHT: PlayerProfile = {
+  id: 316,
+  name: 'Haji WRIGHT',
+  teamCode: 'USA',
+  teamName: 'USA',
+  goalkeeperMatches: 0,
+  captainMatches: 0,
   stats: {
-    appearances: 3, starts: 2, minutesPlayed: 215, goals: 4, assists: 1, ownGoals: 0,
-    shots: 11, shotsOnTarget: 6, yellowCards: 1, redCards: 0,
-    foulsCommitted: 5, foulsSuffered: 7, passes: 98, passAccuracy: 81.5,
+    matchesPlayed: 2, matchesStarted: 0, minutesPlayed: 0, goals: 0, penaltyGoals: 0, ownGoals: 0,
+    yellowCards: 0, redCards: 0, foulsCommitted: 0, freeKicksWon: 0, freeKicksConceded: 0,
+    duelsWon: 0, duelsLost: 0, corners: 0, offsides: 0, distanceKm: 0, manOfTheMatchCount: 0,
+    rating: 6.5, ratingWeighted: null,
   },
 };
 
@@ -65,77 +53,66 @@ describe('PlayerProfileCard', () => {
   });
 
   it('should show all identity fields', () => {
-    const el = render(CAPTAIN);
-    expect(text(el, 'name')).toBe('Sample Captain');
-    expect(text(el, 'team')).toBe('Spain (ESP)');
-    expect(text(el, 'shirtNumber')).toBe('10');
-    expect(text(el, 'position')).toBe('FW');
-    expect(text(el, 'positionDetail')).toBe('ST');
-    expect(text(el, 'birthDate')).toBe('1998-05-17');
-    expect(text(el, 'age')).toBe('28');
-    expect(text(el, 'club')).toBe('Sample Club');
-    expect(text(el, 'height')).toContain('181');
-    expect(text(el, 'preferredFoot')).toBe('left');
+    const el = render(RANGEL);
+    expect(text(el, 'name')).toBe('Raul RANGEL');
+    expect(text(el, 'team')).toBe('Mexico (MEX)');
+    expect(text(el, 'goalkeeperMatches')).toBe('5');
+    expect(text(el, 'captainMatches')).toBe('0');
   });
 
-  it('should show the 14 statistics with readable labels', () => {
-    const el = render(CAPTAIN);
+  it('should show the 19 totals with readable labels', () => {
+    const el = render(RANGEL);
     const expected: [string, string, string][] = [
-      ['appearances', 'Appearances', '3'],
-      ['starts', 'Starts', '2'],
-      ['minutesPlayed', 'Minutes played', '215'],
-      ['goals', 'Goals', '4'],
-      ['assists', 'Assists', '1'],
+      ['matchesPlayed', 'Matches played', '5'],
+      ['matchesStarted', 'Matches started', '5'],
+      ['minutesPlayed', 'Minutes played', '438'],
+      ['goals', 'Goals', '0'],
+      ['penaltyGoals', 'Penalty goals', '0'],
       ['ownGoals', 'Own goals', '0'],
-      ['shots', 'Shots', '11'],
-      ['shotsOnTarget', 'Shots on target', '6'],
-      ['yellowCards', 'Yellow cards', '1'],
+      ['yellowCards', 'Yellow cards', '0'],
       ['redCards', 'Red cards', '0'],
-      ['foulsCommitted', 'Fouls committed', '5'],
-      ['foulsSuffered', 'Fouls suffered', '7'],
-      ['passes', 'Passes', '98'],
-      ['passAccuracy', 'Pass accuracy', '81.5'],
+      ['foulsCommitted', 'Fouls committed', '0'],
+      ['freeKicksWon', 'Free kicks won', '0'],
+      ['freeKicksConceded', 'Free kicks conceded', '0'],
+      ['duelsWon', 'Duels won', '5'],
+      ['duelsLost', 'Duels lost', '5'],
+      ['corners', 'Corners', '0'],
+      ['offsides', 'Offsides', '0'],
+      ['distanceKm', 'Distance (km)', '25.11'],
+      ['manOfTheMatchCount', 'Man of the match', '0'],
+      ['rating', 'Rating', '6.9'],
+      ['ratingWeighted', 'Rating (weighted by minutes)', '6.9'],
     ];
-    expect(el.querySelectorAll('[data-testid^="stat-label-"]').length).toBe(14);
+    expect(el.querySelectorAll('[data-testid^="stat-label-"]').length).toBe(19);
     for (const [key, label, value] of expected) {
       expect(text(el, `stat-label-${key}`)).toBe(label);
-      expect(text(el, `stat-${key}`)).toContain(value);
+      expect(text(el, `stat-${key}`)).toBe(value);
     }
   });
 
-  it('should show "not available" for a null pass accuracy', () => {
-    const el = render(GOALKEEPER);
-    expect(text(el, 'stat-passAccuracy')).toBe('not available');
+  it('should show "not available" for a null weighted rating', () => {
+    const el = render(WRIGHT);
+    expect(text(el, 'stat-ratingWeighted')).toBe('not available');
+    expect(text(el, 'name')).toBe('Haji WRIGHT');
+    expect(text(el, 'team')).toBe('USA (USA)');
   });
 
   it('should show 0 for a zero statistic', () => {
-    const el = render(GOALKEEPER);
+    const el = render(RANGEL);
     expect(text(el, 'stat-goals')).toBe('0');
-    expect(text(el, 'stat-minutesPlayed')).toBe('0');
+    expect(text(el, 'stat-manOfTheMatchCount')).toBe('0');
+    expect(render(WRIGHT).querySelector('[data-testid="stat-minutesPlayed"]')?.textContent?.trim()).toBe('0');
   });
 
-  it('should show the goalkeeper block for a goalkeeper', () => {
-    const el = render(GOALKEEPER);
-    expect(el.querySelector('[data-testid="goalkeeper-block"]')).not.toBeNull();
-    expect(text(el, 'gk-saves')).toBe('0');
-    expect(text(el, 'gk-goalsConceded')).toBe('0');
-    expect(text(el, 'gk-cleanSheets')).toBe('0');
-    expect(text(el, 'gk-penaltiesSaved')).toBe('0');
-  });
-
-  it('should show goalkeeper values', () => {
-    const el = render({ ...GOALKEEPER, goalkeeperStats: { saves: 7, goalsConceded: 2, cleanSheets: 1, penaltiesSaved: 1 } });
-    expect(text(el, 'gk-saves')).toBe('7');
-    expect(text(el, 'gk-goalsConceded')).toBe('2');
-  });
-
-  it('should not render the goalkeeper block for an outfield player', () => {
-    const el = render(CAPTAIN);
+  it('should not show any removed item', () => {
+    const el = render(RANGEL);
+    const content = (el.textContent ?? '').toLowerCase();
+    for (const removed of [
+      'shirt number', 'position', 'birth', 'age', 'club', 'height', 'foot',
+      'assists', 'shots', 'passes', 'goalkeeper statistics',
+    ]) {
+      expect(content).not.toContain(removed);
+    }
     expect(el.querySelector('[data-testid="goalkeeper-block"]')).toBeNull();
-  });
-
-  it('should indicate the captain', () => {
-    expect(text(render(CAPTAIN), 'captain')).toBe('yes');
-    expect(text(render(GOALKEEPER), 'captain')).toBe('no');
   });
 });

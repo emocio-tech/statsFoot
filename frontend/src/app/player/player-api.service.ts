@@ -13,7 +13,7 @@ export class PlayerApiService {
     });
   }
 
-  getProfile(id: string): Observable<PlayerProfile> {
-    return this.http.get<PlayerProfile>(`/api/players/${encodeURIComponent(id)}`);
+  getProfile(id: number): Observable<PlayerProfile> {
+    return this.http.get<PlayerProfile>(`/api/players/${id}`);
   }
 }

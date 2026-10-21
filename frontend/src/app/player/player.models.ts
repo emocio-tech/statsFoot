@@ -1,9 +1,8 @@
 export interface PlayerSummary {
-  id: string;
+  id: number;
   name: string;
   teamCode: string;
   teamName: string;
-  position: string;
 }
 
 export interface PlayerSearchResult {
@@ -13,43 +12,33 @@ export interface PlayerSearchResult {
 }
 
 export interface PlayerStats {
-  appearances: number;
-  starts: number;
-  minutesPlayed: number;
-  goals: number;
-  assists: number;
-  ownGoals: number;
-  shots: number;
-  shotsOnTarget: number;
-  yellowCards: number;
-  redCards: number;
-  foulsCommitted: number;
-  foulsSuffered: number;
-  passes: number;
-  passAccuracy: number | null;
-}
-
-export interface GoalkeeperStats {
-  saves: number;
-  goalsConceded: number;
-  cleanSheets: number;
-  penaltiesSaved: number;
+  matchesPlayed: number | null;
+  matchesStarted: number | null;
+  minutesPlayed: number | null;
+  goals: number | null;
+  penaltyGoals: number | null;
+  ownGoals: number | null;
+  yellowCards: number | null;
+  redCards: number | null;
+  foulsCommitted: number | null;
+  freeKicksWon: number | null;
+  freeKicksConceded: number | null;
+  duelsWon: number | null;
+  duelsLost: number | null;
+  corners: number | null;
+  offsides: number | null;
+  distanceKm: number | null;
+  manOfTheMatchCount: number | null;
+  rating: number | null;
+  ratingWeighted: number | null;
 }
 
 export interface PlayerProfile {
-  id: string;
+  id: number;
   name: string;
   teamCode: string;
   teamName: string;
-  shirtNumber: number;
-  position: string;
-  positionDetail: string;
-  birthDate: string;
-  age: number;
-  club: string;
-  heightCm: number;
-  preferredFoot: string;
-  captain: boolean;
+  goalkeeperMatches: number;
+  captainMatches: number;
   stats: PlayerStats;
-  goalkeeperStats?: GoalkeeperStats;
 }

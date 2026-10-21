@@ -32,7 +32,7 @@ Le BackEnd utilise Maven avec le wrapper (`mvnw` + `pom.xml`) : ne pas dépendre
 ./mvnw test              # lancer les tests
 ```
 
-Les tests et l'application lisent `data/players.json` et `data/teams.json` (voir « Pièges connus »).
+Au premier démarrage, l'application crée la base H2 `data/h2/` et l'alimente depuis `data/donneesStats.json` (voir « Pièges connus »). Les tests utilisent une base H2 en mémoire.
 
 ### FrontEnd (Node)
 
@@ -47,7 +47,7 @@ npm test                 # lancer les tests (non interactif)
 
 - **BackEnd** : Java avec la surcouche Spring Boot.
 - **FrontEnd** : Angular.
-- **Données** : fichiers JSON stockés dans `data/`.
+- **Données** : base **H2** (fichier `data/h2/`, non versionné) alimentée au premier démarrage depuis `data/donneesStats.json` ; le schéma suit `data/donneesStats.sql` (référence PostgreSQL) porté dans `src/main/resources/db/schema.sql`.
 
 ## Conventions
 
@@ -57,9 +57,10 @@ npm test                 # lancer les tests (non interactif)
 
 ## Pièges connus
 
-- **Fichiers JSON de `data/` non versionnés sur `main` ni sur les branches de feature** : ils vivent sur la branche `data`. Pour lancer l'application ou les tests BackEnd en local, les extraire sans les indexer :
-  `git archive origin/data data/players.json data/teams.json | tar -x`, puis les exclure localement dans `.git/info/exclude` (`/data/*.json`). Sans ces fichiers, les tests de données échouent avec le message « data files missing ».
-- **Source de données** : `statsfoot.player-source=json` par défaut ; la source base de données (`database`) existe mais n'est pas utilisée (à activer avec le profil Spring `database`, qui positionne `player-source=database`, et une datasource `spring.datasource.*` fournie au déploiement).
+- **Base H2** : `data/h2/` est ignoré par git et créé au premier démarrage. Pour recharger les données, arrêter l'application et supprimer ce dossier. H2 refuse un chemin relatif sans `./` (`statsfoot.database-file=./data/h2/statsfoot`).
+- **`data/donneesStats.sql` n'est pas exécuté** : c'est du PostgreSQL sans données (commandes psql, `LATERAL`...). Les données viennent de `data/donneesStats.json` ; le schéma H2 est dans `src/main/resources/db/schema.sql` (écarts documentés en tête du fichier).
+- **Anciens fichiers `data/players.json` et `data/teams.json`** : plus utilisés par le code, laissés dans le dépôt.
+- **Tests** : ils n'écrivent jamais dans `data/h2/` (base en mémoire, `src/test/resources/application.properties`).
 
 ## Git
 

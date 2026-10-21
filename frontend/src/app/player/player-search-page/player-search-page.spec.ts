@@ -4,35 +4,28 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { PlayerSearchPage } from './player-search-page';
 import { PlayerProfile, PlayerSearchResult, PlayerSummary } from '../player.models';
 
-const SUZUKI: PlayerSummary = { id: 'P-0001', name: 'Sami Suzuki', teamCode: 'ESP', teamName: 'Spain', position: 'GK' };
+const RANGEL: PlayerSummary = { id: 1, name: 'Raul RANGEL', teamCode: 'MEX', teamName: 'Mexico' };
 
 const PROFILE: PlayerProfile = {
-  id: 'P-0001',
-  name: 'Sami Suzuki',
-  teamCode: 'ESP',
-  teamName: 'Spain',
-  shirtNumber: 1,
-  position: 'GK',
-  positionDetail: 'GK',
-  birthDate: '2006-11-03',
-  age: 19,
-  club: 'Club América',
-  heightCm: 190,
-  preferredFoot: 'right',
-  captain: false,
+  id: 1,
+  name: 'Raul RANGEL',
+  teamCode: 'MEX',
+  teamName: 'Mexico',
+  goalkeeperMatches: 5,
+  captainMatches: 0,
   stats: {
-    appearances: 0, starts: 0, minutesPlayed: 0, goals: 0, assists: 0, ownGoals: 0,
-    shots: 0, shotsOnTarget: 0, yellowCards: 0, redCards: 0,
-    foulsCommitted: 0, foulsSuffered: 0, passes: 0, passAccuracy: null,
+    matchesPlayed: 5, matchesStarted: 5, minutesPlayed: 438, goals: 0, penaltyGoals: 0, ownGoals: 0,
+    yellowCards: 0, redCards: 0, foulsCommitted: 0, freeKicksWon: 0, freeKicksConceded: 0,
+    duelsWon: 5, duelsLost: 5, corners: 0, offsides: 0, distanceKm: 25.11, manOfTheMatchCount: 0,
+    rating: 6.9, ratingWeighted: 6.9,
   },
-  goalkeeperStats: { saves: 0, goalsConceded: 0, cleanSheets: 0, penaltiesSaved: 0 },
 };
 
 // Rows generated from the shape of the contract (ids and names are synthetic placeholders).
 function summaries(count: number): PlayerSummary[] {
   return Array.from({ length: count }, (_, i) => ({
-    ...SUZUKI,
-    id: `P-${String(i + 1).padStart(4, '0')}`,
+    ...RANGEL,
+    id: i + 1,
     name: `Player ${i + 1}`,
   }));
 }
@@ -95,21 +88,21 @@ describe('PlayerSearchPage', () => {
   });
 
   it('should send the input as typed to the API', () => {
-    search('  sámi   Suzuki ');
+    search('  sámi   Rangel ');
     const req = searchRequest();
-    expect(req.request.params.get('name')).toBe('  sámi   Suzuki ');
+    expect(req.request.params.get('name')).toBe('  sámi   Rangel ');
     req.flush(result([], 0));
   });
 
   it('should open the profile directly when there is one result', async () => {
-    search('sami suzuki');
-    searchRequest().flush(result([SUZUKI], 1));
-    http.expectOne('/api/players/P-0001').flush(PROFILE);
+    search('rangel');
+    searchRequest().flush(result([RANGEL], 1));
+    http.expectOne('/api/players/1').flush(PROFILE);
     await settle();
     expect(rows().length).toBe(0);
     expect(q('profile')).not.toBeNull();
-    expect(el.textContent).toContain('Sami Suzuki');
-    expect(el.textContent).toContain('Spain (ESP)');
+    expect(el.textContent).toContain('Raul RANGEL');
+    expect(el.textContent).toContain('Mexico (MEX)');
   });
 
   it('should list 16 results then open the profile on click', async () => {
@@ -118,13 +111,13 @@ describe('PlayerSearchPage', () => {
     await settle();
     expect(rows().length).toBe(16);
     expect(rows()[0].textContent).toContain('Player 1');
-    expect(rows()[0].textContent).toContain('Spain (ESP)');
-    expect(rows()[0].textContent).toContain('GK');
+    expect(rows()[0].textContent).toContain('Mexico (MEX)');
+    expect(rows()[0].textContent).not.toContain('GK');
     expect(q('profile')).toBeNull();
     expect(q('message')).toBeNull();
 
     (rows()[2] as HTMLElement).click();
-    http.expectOne('/api/players/P-0003').flush({ ...PROFILE, id: 'P-0003', name: 'Player 3' });
+    http.expectOne('/api/players/3').flush({ ...PROFILE, id: 3, name: 'Player 3' });
     await settle();
     expect(q('profile')).not.toBeNull();
     expect(q('profile')?.textContent).toContain('Player 3');
@@ -161,9 +154,9 @@ describe('PlayerSearchPage', () => {
     expect(q('message')?.textContent?.trim()).toBe('Player data is currently unavailable.');
     expect((q('search-button') as HTMLButtonElement).disabled).toBe(false);
 
-    search('sami suzuki');
-    searchRequest().flush(result([SUZUKI], 1));
-    http.expectOne('/api/players/P-0001').flush(PROFILE);
+    search('rangel');
+    searchRequest().flush(result([RANGEL], 1));
+    http.expectOne('/api/players/1').flush(PROFILE);
     await settle();
     expect(q('profile')).not.toBeNull();
     expect(q('message')).toBeNull();
@@ -188,7 +181,7 @@ describe('PlayerSearchPage', () => {
     searchRequest().flush(result(summaries(16), 16));
     await settle();
     (rows()[0] as HTMLElement).click();
-    http.expectOne('/api/players/P-0001').flush({ error: 'Player not found.' }, { status: 404, statusText: 'Not Found' });
+    http.expectOne('/api/players/1').flush({ error: 'Player not found.' }, { status: 404, statusText: 'Not Found' });
     await settle();
     expect(q('message')?.textContent?.trim()).toBe('Player not found.');
     expect(q('profile')).toBeNull();
@@ -199,7 +192,7 @@ describe('PlayerSearchPage', () => {
     searchRequest().flush(result(summaries(50), 100, true));
     await settle();
     (rows()[0] as HTMLElement).click();
-    http.expectOne('/api/players/P-0001').flush(PROFILE);
+    http.expectOne('/api/players/1').flush(PROFILE);
     await settle();
     expect(q('profile')).not.toBeNull();
 

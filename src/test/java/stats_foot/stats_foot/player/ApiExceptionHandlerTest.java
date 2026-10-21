@@ -2,8 +2,10 @@ package stats_foot.stats_foot.player;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -39,32 +41,39 @@ class ApiExceptionHandlerTest {
 
 	@Test
 	void playerNotFoundGivesNotFound() throws Exception {
-		when(playerService.getProfile(any())).thenThrow(new PlayerNotFoundException("anything"));
-		mockMvc.perform(get("/api/players/P-1"))
+		when(playerService.getProfile(anyInt())).thenThrow(new PlayerNotFoundException("anything"));
+		mockMvc.perform(get("/api/players/999999"))
 				.andExpect(status().isNotFound())
-				.andExpect(jsonPath("$.error").value("Player not found."));
+				.andExpect(content().json("{\"error\":\"Player not found.\"}", true));
+	}
+
+	@Test
+	void nonNumericIdGivesNotFound() throws Exception {
+		mockMvc.perform(get("/api/players/abc"))
+				.andExpect(status().isNotFound())
+				.andExpect(content().json("{\"error\":\"Player not found.\"}", true));
 	}
 
 	@Test
 	void unavailableDataGivesServiceUnavailableWithoutPathNorTrace() throws Exception {
-		Exception cause = new IOException("C:\\secret\\data\\players.json (No such file)");
+		Exception cause = new IOException("C:\\secret\\data\\donneesStats.json (No such file)");
 		when(playerService.search(any()))
-				.thenThrow(new PlayerDataUnavailableException("C:\\secret\\data\\players.json", cause));
+				.thenThrow(new PlayerDataUnavailableException("C:\\secret\\data\\donneesStats.json", cause));
 		String body = mockMvc.perform(get("/api/players").param("name", "abc"))
 				.andExpect(status().isServiceUnavailable())
 				.andExpect(jsonPath("$.error").value("Player data is currently unavailable."))
 				.andReturn().getResponse().getContentAsString();
-		assertThat(body).doesNotContain("secret").doesNotContain("players.json").doesNotContain("Exception")
-				.doesNotContain("\\").doesNotContain("at stats_foot");
+		assertThat(body).doesNotContain("secret").doesNotContain("donneesStats").doesNotContain("Exception")
+				.doesNotContain("\\").doesNotContain("/").doesNotContain("at stats_foot");
 	}
 
 	@Test
 	void unavailableDataOnProfileGivesServiceUnavailable() throws Exception {
-		when(playerService.getProfile(any()))
+		when(playerService.getProfile(anyInt()))
 				.thenThrow(new PlayerDataUnavailableException("x", new RuntimeException("y")));
-		mockMvc.perform(get("/api/players/P-0001"))
+		mockMvc.perform(get("/api/players/1"))
 				.andExpect(status().isServiceUnavailable())
-				.andExpect(jsonPath("$.error").value("Player data is currently unavailable."));
+				.andExpect(content().json("{\"error\":\"Player data is currently unavailable.\"}", true));
 	}
 
 	@Test

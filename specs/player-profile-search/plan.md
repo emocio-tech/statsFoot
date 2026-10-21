@@ -1,3 +1,5 @@
+> **Amended by `specs/player-h2-database/`**: the data source (JSON files replaced by an H2 database), the profile content (new statistics, integer player ids) and the API contract changed. The search behaviour described here is unchanged.
+
 # Plan: Player profile search
 
 ## Approach

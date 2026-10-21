@@ -1,9 +1,21 @@
-# Données Coupe du Monde 2026 (TEST)
+# Data files
+
+## Current data (used by the application)
+
+- `donneesStats.json`: tournament data of the 2026 World Cup (competition, 48 teams, 1039 players with their tournament totals, 104 matches with line-ups, substitutions, goals, bookings, penalty shootouts, team and player ratings and detailed statistics). It is imported at startup into the H2 database when the database is empty.
+- `donneesStats.sql`: PostgreSQL reference of the schema, of the ratings computation and of the tournament views. It contains no data and is **not executed** by the application; its schema is ported to H2 in `src/main/resources/db/schema.sql`.
+- `h2/`: H2 file database created by the application at first start (ignored by git). Delete it to reload the data.
+
+## Legacy files (no longer used by the code)
+
+The sections below describe `players.json`, `teams.json` and the files they were generated with (`scripts/generate_test_data.py`, `matches.json`, `match_player_stats/`, which are not in the repository any more). They are kept as they were written, in French. The application does not read them any more.
+
+### Données Coupe du Monde 2026 (TEST)
 
 Données **fictives** générées par `scripts/generate_test_data.py` (`py scripts/generate_test_data.py`, graine fixe).
 Les noms de joueurs, résultats et stats sont inventés ; le tableau final est simplifié (pas le tableau officiel FIFA).
 
-## Conventions
+#### Conventions
 
 - Clés étrangères : `teamId` = code FIFA (`FRA`), `playerId` = `P-0001`, `matchId` = `M001`, `stadiumId` = `S-NYNJ`, `refereeId` = `R-001`, `coachId` = `C-001`.
 - `score.fullTime` = score après 90 min ; `extraTime` = buts marqués **pendant** la prolongation (`null` si non jouée) ; `penalties` = tirs au but (`null` si non joués).

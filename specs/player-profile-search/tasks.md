@@ -1,3 +1,5 @@
+> **Amended by `specs/player-h2-database/`**: the data source (JSON files replaced by an H2 database), the profile content (new statistics, integer player ids) and the API contract changed. The search behaviour described here is unchanged.
+
 # Tasks: Player profile search
 
 Conventions: tests are written first (or with the code) and seen failing before the implementation. BackEnd tests use the real `data/players.json` and `teams.json` (local, never committed, see plan D3). Test method names are in English like the rest of the product. Reference data: `P-0001` (goalkeeper, birth 2006-11-03, `passAccuracy` null), `P-0003` (non-null pass accuracy), `P-0005` (captain), `P-0020` (forward), `P-0004` "Kwame Ramírez"; queries `sami suzuki` (1), `suz` (16), `ou` (exactly 50), `id` (exactly 51), `a` (1130), `xyzxyz` (0). All values asserted in tests are read back from the JSON by the test, not copied by hand.
