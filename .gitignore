@@ -19,3 +19,7 @@ frontend/out-tsc/
 # OS
 .DS_Store
 Thumbs.db
+
+# Secrets et journaux
+.env*
+*.log

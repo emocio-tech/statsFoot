@@ -1,5 +1,6 @@
 #!/bin/sh
-# Lance les tests du backend avant chaque commit ; le commit est annulé si un test échoue.
+# Avant chaque commit : build Angular (le frontend est embarqué dans le jar) puis tests du backend ;
+# le commit est annulé si le build ou un test échoue.
 # Activation (une fois par clone) : git config core.hooksPath .githooks
 # Contournement ponctuel : git commit --no-verify
 
@@ -27,17 +28,19 @@ esac
 log="$(mktemp)"
 trap 'rm -f "$log"' EXIT
 
-echo "pre-commit : lancement des tests du backend..."
-if ! "$MVNW" -B -pl backend test >"$log" 2>&1; then
+echo "pre-commit : build Angular et tests du backend..."
+if ! "$MVNW" -B -pl frontend,backend test >"$log" 2>&1; then
     # Tests en échec, leur message, puis le résumé ; sinon (erreur de compilation...) la fin du log
     if grep -q "<<< \(FAILURE\|ERROR\)!" "$log"; then
         grep -A 4 -E "^\[ERROR\] [^ ]+ -- Time elapsed.*<<< (FAILURE|ERROR)!" "$log" | grep -v "^\s*at \|^--$" >&2
         grep -E "^\[ERROR\] Tests run:" "$log" | tail -n 1 >&2
     else
-        grep -E "^\[ERROR\]" "$log" | head -n 20 >&2
+        # erreurs du build Angular (« [INFO] X [ERROR] TS2322: ... » et la ligne du fichier), puis erreurs Maven
+        grep -E -A 2 "\[ERROR\] TS[0-9]+" "$log" | head -n 15 >&2
+        grep -E "^\[ERROR\]" "$log" | head -n 5 >&2
     fi
     echo "" >&2
-    echo "pre-commit : des tests échouent, commit annulé." >&2
+    echo "pre-commit : le build Angular ou des tests échouent, commit annulé." >&2
     echo "Rapports : backend/target/surefire-reports" >&2
     exit 1
 fi
@@ -45,5 +48,5 @@ fi
 summary="$(grep -E "^\[(INFO|WARNING)\] Tests run:" "$log" | tail -n 1)"
 echo "pre-commit : tests OK ${summary#*] }"
 if grep -q "Tests run:.*Skipped: [1-9]" "$log"; then
-    echo "pre-commit : attention, des tests ont été ignorés (base PostgreSQL de test indisponible ?)."
+    echo "pre-commit : des tests ont été ignorés (évaluation réelle de l'assistant, désactivée par défaut ; ou base PostgreSQL de test indisponible)."
 fi
