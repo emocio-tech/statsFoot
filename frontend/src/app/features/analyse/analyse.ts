@@ -180,6 +180,8 @@ export class Analyse {
 
   protected openRow(row: TopRow): void {
     this.picked.set((this.answer()?.top ?? []).find((e) => `${e.scope}-${e.id}` === row.key) ?? null);
+    // le rapport s'affiche au-dessus du tableau : l'amener à l'écran
+    setTimeout(() => document.querySelector('.report')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   }
 
   protected readonly topRows = computed<TopRow[]>(() =>
