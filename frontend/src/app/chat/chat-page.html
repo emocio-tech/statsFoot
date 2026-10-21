@@ -1,0 +1,19 @@
+<main class="page">
+  <h1>Chat</h1>
+
+  <form class="chat" data-testid="chat-form" (submit)="onSubmit($event, promptInput.value)">
+    <input
+      id="prompt"
+      #promptInput
+      data-testid="prompt-input"
+      type="text"
+      placeholder="Type your prompt..."
+      aria-label="Prompt"
+      autocomplete="off"
+      required
+    />
+    <button type="submit" data-testid="send-button">Send</button>
+  </form>
+
+  <pre class="response" data-testid="response">{{ response() }}</pre>
+</main>
