@@ -7,7 +7,16 @@ import java.util.List;
  * plusieurs, ou aucune ; avec l'origine (mots-clés ou assistant).
  */
 public record Interpretation(Outcome outcome, AnalyseCriterion criterion, List<AnalyseCriterion> alternatives,
-                             Source source) {
+                             Source source, boolean unrelated) {
+
+    public Interpretation(Outcome outcome, AnalyseCriterion criterion, List<AnalyseCriterion> alternatives, Source source) {
+        this(outcome, criterion, alternatives, source, false);
+    }
+
+    /** Aucune interprétation, et l'assistant a jugé la question sans rapport avec le catalogue : réponse libre possible. */
+    public Interpretation asUnrelated() {
+        return new Interpretation(outcome, criterion, alternatives, source, true);
+    }
 
     public enum Outcome { RECOGNIZED, AMBIGUOUS, NONE }
 

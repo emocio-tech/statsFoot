@@ -1,6 +1,10 @@
 package com.emocio.analysefoot.analyse;
 
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.tool.ToolCallbackProvider;
+import org.springframework.beans.factory.BeanFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
@@ -14,6 +18,7 @@ import org.springframework.web.client.RestClient;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.util.List;
 
 /**
  * Assistant d'interprétation (tool rank) par le {@link ChatClient} de Spring AI, au choix du fournisseur
@@ -31,6 +36,13 @@ import java.time.Duration;
 public class AssistantConfig {
 
     static final String BEDROCK = "bedrock";
+
+    /** Absent hors contexte Spring (tests unitaires) : le mode libre est alors indisponible. */
+    @Autowired(required = false)
+    private BeanFactory beanFactory;
+
+    static final int FREE_TIMEOUT_FACTOR = 6;
+    static final int FREE_MIN_TOKENS = 400;
 
     @ConfigurationProperties("analyse.assistant")
     public record Properties(String provider, String apiKey, String baseUrl, String model, Duration timeout,
@@ -60,8 +72,15 @@ public class AssistantConfig {
         String model = bedrock ? properties.bedrock().model() : properties.model();
         int maxTokens = bedrock ? properties.bedrock().maxTokens() : properties.maxTokens();
         String toolChoice = bedrock ? properties.bedrock().toolChoice() : properties.toolChoice();
+        // mode libre : plusieurs allers et retours, donc un délai plus long que celui du seul choix du critère ;
+        // les tools de lecture sont ceux du serveur MCP (mêmes fonctions, même SQL), résolus à l'appel
+        Duration freeTimeout = properties.timeout().multipliedBy(FREE_TIMEOUT_FACTOR);
         return new SpringAiQuestionInterpreter(chatClient(baseUrl, apiKey, model, properties.timeout()),
-                options(model, maxTokens, bedrock, !"auto".equalsIgnoreCase(toolChoice)));
+                options(model, maxTokens, bedrock, !"auto".equalsIgnoreCase(toolChoice)),
+                chatClient(baseUrl, apiKey, model, freeTimeout),
+                tools -> freeOptions(model, Math.max(maxTokens, FREE_MIN_TOKENS), bedrock, tools),
+                beanFactory == null ? null
+                        : () -> List.of(beanFactory.getBean("statsFootTools", ToolCallbackProvider.class).getToolCallbacks()));
     }
 
     @Bean
@@ -86,6 +105,17 @@ public class AssistantConfig {
                 .retryTemplate(RetryTemplate.builder().maxAttempts(1).build())
                 .build();
         return ChatClient.create(chatModel);
+    }
+
+    /** Options du mode libre : tools de lecture au choix du modèle, exécutés par l'application et non par Spring AI. */
+    static OpenAiChatOptions freeOptions(String model, int maxTokens, boolean maxCompletionTokens,
+                                         List<ToolCallback> tools) {
+        OpenAiChatOptions.Builder builder = OpenAiChatOptions.builder()
+                .model(model)
+                .toolCallbacks(tools)
+                .internalToolExecutionEnabled(false)
+                .toolChoice(OpenAiApi.ChatCompletionRequest.ToolChoiceBuilder.AUTO);
+        return (maxCompletionTokens ? builder.maxCompletionTokens(maxTokens) : builder.maxTokens(maxTokens)).build();
     }
 
     /**

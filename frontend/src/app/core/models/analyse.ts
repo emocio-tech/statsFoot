@@ -2,7 +2,7 @@ import { Stage } from './rating';
 
 export type AnalyseScope = 'PLAYER' | 'TEAM';
 
-export type AnalyseStatus = 'ANSWERED' | 'AMBIGUOUS' | 'NOT_RECOGNIZED' | 'NO_DATA' | 'FOUND' | 'CHOOSE';
+export type AnalyseStatus = 'ANSWERED' | 'AMBIGUOUS' | 'NOT_RECOGNIZED' | 'NO_DATA' | 'FOUND' | 'CHOOSE' | 'FREE_TEXT';
 
 /** Une question du catalogue de l'onglet Analyse. */
 export interface AnalyseQuestion {
@@ -36,6 +36,15 @@ export interface AssistantStatus {
   enabled: boolean;
 }
 
+/** Une étape des échanges d'une recherche : OUT = appel (aller), IN = retour ; `ms` depuis le début de la requête. */
+export interface TraceStep {
+  actor: 'APP' | 'LLM' | 'TOOL' | 'MCP' | 'SQL';
+  direction: 'OUT' | 'IN';
+  label: string;
+  detail: string;
+  ms: number;
+}
+
 export interface AnalyseAnswer {
   status: AnalyseStatus;
   question: AnalyseQuestion | null;
@@ -46,6 +55,10 @@ export interface AnalyseAnswer {
   candidates: AnalyseQuestion[];
   /** null pour une suggestion cliquée. */
   interpretation: AnalyseInterpretation | null;
+  /** Échanges de la requête (vide si la trace est désactivée côté serveur). */
+  trace?: TraceStep[];
+  /** Réponse libre du LLM (statut FREE_TEXT), sans rapport détaillé. */
+  text?: string | null;
 }
 
 /** Rapport complet d'un joueur ; `fictitiousFields` liste les champs FICTIFS de `totals`. */

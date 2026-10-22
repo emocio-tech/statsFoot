@@ -94,8 +94,9 @@ Références : [spec.md](spec.md), constitution v1.1.0 (principes V et VII), `sp
 
 ## R8. Confidentialité (FR-007, FR-008)
 
-- **Decision** : la question n'est ni journalisée ni conservée ; les journaux d'erreur citent le type
-  d'erreur, jamais la question. Mention permanente sous la barre de recherche, seulement si
+- **Decision** : la question n'est pas conservée. Initialement elle n'était jamais journalisée ; depuis amendement du 2026-10-22 (constitution 2.0.0),
+  la trace des échanges (aller/retour appli, LLM, tool, SQL, MCP) la journalise et l'affiche, sauf si
+  ANALYSE_TRACE=false. Les journaux d'erreur citent le type d'erreur. Mention permanente sous la barre de recherche, seulement si
   `enabled` : « Une question non reconnue peut être transmise à Anthropic (Claude) pour être interprétée. »
 
 ## R9. Tests et évaluation

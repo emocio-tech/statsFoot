@@ -68,7 +68,8 @@ Définition du tool (format OpenAI ; le schéma est le même qu'avec le format A
 Lecture de la réponse : `choices[0].message.tool_calls` doit contenir un appel nommé `rank` dont `arguments` (chaîne JSON)
 est validé par le serveur (data-model §1). Tout autre cas (texte seul, arguments illisibles, erreur HTTP, délai
 dépassé) → aucune interprétation, repli sur les mots-clés. La consommation (`usage.prompt_tokens`,
-`completion_tokens`) est journalisée, jamais la question.
+`completion_tokens`) est journalisée ; la question ne l'est que par la trace des échanges (amendement du 2026-10-22 (constitution 2.0.0),
+désactivable par ANALYSE_TRACE=false).
 
 ## 3. Configuration
 

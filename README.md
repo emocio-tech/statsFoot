@@ -102,7 +102,7 @@ Quand les mots-clés ne reconnaissent pas une question libre de l'onglet Analyse
 peut la faire interpréter par un LLM, via le `ChatClient` de Spring AI (format OpenAI Chat Completions) et un
 unique tool `rank(criterion, scope)`. Le modèle ne fait que choisir une des 8 questions du catalogue (ou aucune) ;
 le tool n'est jamais exécuté et les chiffres viennent toujours du SQL. Seule la question saisie est transmise ;
-elle n'est pas journalisée (seuls le nombre de jetons et le type d'une erreur le sont). Délai de 3 s, aucune
+elle n'est journalisée que par la trace des échanges (voir ci-dessous ; `ANALYSE_TRACE=false` la désactive), sinon seuls le nombre de jetons et le type d'une erreur le sont. Délai de 3 s, aucune
 nouvelle tentative, repli silencieux sur les mots-clés.
 
 Deux fournisseurs, choisis par `LLM_PROVIDER` :
@@ -205,3 +205,11 @@ npm start
 ```
 
 Le front est alors servi sur http://localhost:4200.
+
+### Trace des échanges (logs et interface)
+
+Chaque recherche de l'onglet Analyse journalise (logger `analyse.trace`, niveau INFO) ses échanges, aller (`-->`) et
+retour (`<--`), entre l'appli, le LLM, le tool `rank`, le SQL et les clients MCP, puis les renvoie dans le champ `trace`
+de la réponse : l'interface les affiche sous le résultat (« Échanges de la recherche »). Les appels reçus par le serveur
+MCP (`questions`, `rank`, `find`, `player_report`, `team_report`) sont journalisés de la même façon. La trace contient
+la question saisie ; `ANALYSE_TRACE=false` la supprime des journaux et de la réponse.

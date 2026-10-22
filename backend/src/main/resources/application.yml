@@ -57,6 +57,10 @@ analyse:
       max-tokens: ${BEDROCK_MAX_TOKENS:1024}
       max-per-minute: ${BEDROCK_MAX_PER_MINUTE:30}
 
+# Trace des échanges (appli, LLM, tool rank, MCP, SQL) : journalisée (logger analyse.trace) et renvoyée à l'interface.
+# Elle contient la question saisie : mettre ANALYSE_TRACE=false pour ne plus la journaliser.
+analyse.trace.enabled: ${ANALYSE_TRACE:true}
+
 management:
   endpoints:
     web:

@@ -8,6 +8,14 @@ public interface QuestionInterpreter {
 
     Interpretation interpret(String question);
 
+    /**
+     * Mode libre, pour une question sans rapport avec le catalogue : le modèle appelle des tools de lecture (allers
+     * et retours LLM, tool) puis rédige une réponse courte. Null si le mode n'est pas disponible ou n'aboutit pas.
+     */
+    default String answerFreely(String question) {
+        return null;
+    }
+
     /** Faux sans clé d'API : l'assistant n'est alors jamais consulté. */
     boolean enabled();
 }

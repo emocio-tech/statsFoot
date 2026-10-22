@@ -189,5 +189,6 @@ Task: "AssistantRateLimiter et son test"
 ## Notes
 
 - Aucune migration, aucun changement de `donneesStats.sql` (le hook PreToolUse sur les migrations n'est pas sollicité).
-- Le modèle ne produit jamais un chiffre affiché ; il ne choisit qu'un identifiant du catalogue (constitution VII).
+- Pour une question du catalogue, le modèle ne choisit qu'un identifiant et le classement vient du SQL ; le mode
+  libre (amendement du 2026-10-22 (constitution 2.0.0), constitution VII) peut rédiger une réponse courte étiquetée, calculs permis.
 - Aucune requête payante dans la suite de tests par défaut.

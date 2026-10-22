@@ -129,7 +129,9 @@ par l'assistant, et vérifier l'affichage de l'interprétation et de son origine
 
 - **FR-001**: L'assistant MUST se limiter à choisir une question du catalogue (et sa portée
   joueur ou équipe), à déclarer une ambiguïté entre plusieurs questions, ou à n'en choisir
-  aucune ; il MUST ne produire aucun chiffre, nom ni texte affiché comme réponse.
+  aucune ; pour la réponse à une question du catalogue, aucun classement ne vient de lui (amendement du 2026-10-22 (constitution 2.0.0) : une
+  question sans rapport avec le catalogue peut être traitée par le mode libre, réponse courte étiquetée à partir
+  de tools de lecture, calculs permis ; voir la constitution, principe VII).
 - **FR-002**: Toute réponse obtenue via l'assistant MUST provenir du même calcul que la
   suggestion correspondante (mêmes gagnants, valeurs, ex aequo, top 5, rapport).
 - **FR-003**: L'assistant MUST être consulté seulement quand les mots-clés ne reconnaissent
@@ -199,4 +201,5 @@ par l'assistant, et vérifier l'affichage de l'interprétation et de son origine
 - Le serveur MCP « statsfoot », le skill d'ajout de critère et les hooks (étape 6 du cadrage)
   sont hors périmètre.
 - L'onglet reste accessible sans compte ; aucune donnée de visiteur n'est conservée, ni par
-  l'application ni dans des journaux (la question transmise n'est pas journalisée).
+  l'application. Initialement la question n'était pas journalisée ; depuis amendement du 2026-10-22 (constitution 2.0.0), la trace des échanges la
+  journalise et l'affiche (désactivable par ANALYSE_TRACE=false).

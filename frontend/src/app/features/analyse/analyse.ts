@@ -54,6 +54,9 @@ interface TopRow {
                 <button type="button" (click)="choose(c.id)">{{ c.label }}</button>
               }
             </nav>
+          } @else if (a.status === 'FREE_TEXT') {
+            <p class="free-text"><strong>{{ a.text }}</strong></p>
+            <p class="muted free-note">Réponse libre du LLM, à partir des outils de lecture de la base (question hors catalogue).</p>
           } @else if (a.status === 'NOT_RECOGNIZED') {
             <p>Question non reconnue. Essayez plutôt l'une de ces questions :</p>
             <nav class="suggestions">
@@ -113,6 +116,22 @@ interface TopRow {
             <app-stats-table [rows]="topRows()" [columns]="topColumns" rowKey="key" [showIndex]="false"
               [clickable]="true" (rowClick)="openRow($event)" />
           }
+          @if (a.trace?.length) {
+            <details class="trace">
+              <summary>Échanges de la recherche ({{ a.trace!.length }} étapes)</summary>
+              <ol>
+                @for (t of a.trace; track $index) {
+                  <li [class]="'step ' + t.actor.toLowerCase()">
+                    <span class="arrow" [title]="t.direction === 'OUT' ? 'aller' : 'retour'">{{ t.direction === 'OUT' ? '→' : '←' }}</span>
+                    <span class="actor">{{ t.actor }}</span>
+                    <span class="label">{{ t.label }}</span>
+                    @if (t.detail) { <code class="detail">{{ t.detail }}</code> }
+                    <span class="ms muted">+{{ t.ms }} ms</span>
+                  </li>
+                }
+              </ol>
+            </details>
+          }
         </section>
       }
     }
@@ -138,6 +157,18 @@ interface TopRow {
       border: 1px solid var(--accent); color: var(--accent); font-size: 0.8rem;
     }
     h4 { margin: 1.2rem 0 0.4rem; }
+    .free-text { font-size: 1.15rem; margin: 0.5rem 0 0.2rem; }
+    .free-note { font-size: 0.8rem; margin: 0; }
+    .trace { margin-top: 1.5rem; font-size: 0.85rem; }
+    .trace summary { cursor: pointer; color: var(--muted); }
+    .trace ol { list-style: none; margin: 0.5rem 0 0; padding: 0; display: grid; gap: 0.25rem; }
+    .step { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: baseline; padding: 0.25rem 0.5rem; border-left: 3px solid var(--border); }
+    .step.llm { border-left-color: var(--accent); }
+    .step.tool { border-left-color: #b8860b; }
+    .step.mcp { border-left-color: #2e8b57; }
+    .step.sql { border-left-color: #6a5acd; }
+    .step .actor { font-weight: 600; min-width: 3rem; }
+    .step .detail { word-break: break-word; }
     .report { margin-top: 1rem; padding: 1rem; border: 1px solid var(--border); border-radius: 0.5rem; background: var(--surface); }
   `,
 })

@@ -38,7 +38,7 @@ reconnues par mots-clés sans délai ajouté
 
 **Constraints**: modèle `claude-haiku-5-5` ; `tool_choice` forcé sur `rank`, `strict: true` ; aucun paramètre
 d'échantillonnage (400 sur Haiku 5.5) ; délai 3 s, `maxRetries` 0 ; 30 appels / 60 s ; question jamais
-journalisée ; application fonctionnelle sans clé
+journalisée sauf par la trace des échanges (désactivable, ANALYSE_TRACE=false) ; application fonctionnelle sans clé
 
 **Scale/Scope**: 1 tool, 1 appel par question non reconnue, 2 routes touchées (`/api/analyse?q=`, nouvelle
 `/api/analyse/assistant`), 1 écran modifié (Analyse)
@@ -55,7 +55,7 @@ journalisée ; application fonctionnelle sans clé
 | IV. API = contrat | ajout compatible `interpretation` dans `AnalyseAnswer` ; nouvelle route `GET /api/analyse/assistant` testée et ajoutée au README | ✅ | ✅ |
 | V. Simplicité, branche unique | seule dépendance ajoutée : le SDK Anthropic, explicitement prévu par la constitution ; plafond et délai sans bibliothèque ; commits sur `initDonneesNotation` | ✅ | ✅ |
 | VI. Origine des données | aucune nouvelle donnée ; les mentions « données fictives » existantes sont conservées | ✅ | ✅ |
-| VII. Chiffres du SQL | le modèle ne choisit qu'un identifiant du catalogue fermé (énumération stricte) ; aucun chiffre ni texte produit par le modèle n'est affiché ; fonctionne sans clé (mots-clés) ; clé côté serveur en variable d'environnement | ✅ | ✅ |
+| VII. Chiffres du SQL | le modèle ne choisit qu'un identifiant du catalogue fermé (énumération stricte) ; pour une question du catalogue, aucun classement ne vient du modèle (mode libre hors catalogue : voir la constitution 2.0.0, réponse courte étiquetée, calculs permis, tracée) ; fonctionne sans clé (mots-clés) ; clé côté serveur en variable d'environnement | ✅ | ✅ |
 
 Aucune dérogation : la section Complexity Tracking est vide.
 
