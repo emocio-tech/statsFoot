@@ -2,6 +2,7 @@ package stats_foot.stats_foot.controller;
 
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.core.Ordered;
@@ -48,6 +49,7 @@ public class ChatController {
                 .defaultSystem(SYSTEM_PROMPT)
                 .defaultAdvisors(
                         MessageChatMemoryAdvisor.builder(chatMemory).build(),
+                        new SimpleLoggerAdvisor(),
                         new TokenUsageLoggingAdvisor(Ordered.LOWEST_PRECEDENCE))
                 .defaultTools(playerTools)
                 .build();
