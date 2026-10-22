@@ -1,5 +1,22 @@
 <!--
 Sync Impact Report
+- Version change: 2.1.0 → 2.2.0 (MINEUR : le principe VII n'impose plus de reconnaissance par mots-clés ni de plafond
+  d'appels par minute ; le LLM devient le point d'entrée de la recherche)
+- Modified principles:
+  - VII. Le LLM est consulté en priorité pour toute saisie qui n'est pas un nom de joueur ou d'équipe ; il n'y a plus
+    de reconnaissance par mots-clés ni de tri préalable par un appel `rank` imposé. Le tool `rank(scope, metric,
+    order)` devient un tool de lecture comme les autres, exécuté par l'application (classement en SQL), que le
+    modèle appelle quand il le juge utile, avec `metrics`, `stat`, `matches`, `find`, `player_report`,
+    `team_report` et `calculate`. Le catalogue des 8 questions ne sert plus qu'aux suggestions cliquables. Le
+    plafond d'appels par minute est supprimé ; reste un plafond d'allers-retours par saisie. Sans clé ou si le
+    modèle n'aboutit pas : recherche par nom et suggestions
+- Added/removed sections: aucune
+- Templates requiring updates: aucun modèle ; specs/002-tool-claude-rank alignée (amendement 2) ; README déjà à jour
+- Follow-up TODOs: aucun
+-->
+
+<!--
+Sync Impact Report (précédent)
 - Version change: 2.0.1 → 2.1.0 (MINEUR : élargissement notable du principe VII ; le tool `rank` ne s'appuie plus
   sur le catalogue des 8 questions)
 - Modified principles:
@@ -154,34 +171,34 @@ toute analyse.
 
 ### VII. Les classements viennent du SQL ; le modèle de langage est borné et tracé
 
-- Deux listes fermées, définies une seule fois côté backend, servent de base au Tool, au serveur MCP, à l'API et à
-  l'interface : les questions du catalogue (`AnalyseCriterion`, utilisées par les mots-clés et les suggestions) et
-  les statistiques de joueur et d'équipe (`StatMetrics`, utilisées par les tools `rank` et `stat`).
+- Deux listes fermées, définies une seule fois côté backend, servent de base aux tools, au serveur MCP, à l'API et à
+  l'interface : les questions du catalogue (`AnalyseCriterion`, utilisées par les suggestions cliquables) et les
+  statistiques de joueur et d'équipe (`StatMetrics`, utilisées par les tools `rank` et `stat`).
 - Chaque question du catalogue et chaque statistique DOIT avoir une requête SQL sur les vues du tournoi ; chaque
   question du catalogue DOIT avoir une règle d'égalité explicite ; pour un classement générique, la valeur seule
   départage. Dans tous les cas les ex aequo DOIVENT être affichés, jamais cachés.
-- Le modèle de langage (Tool `rank(scope, metric, order)` ; Claude ou un autre modèle du projet) sert à traduire
-  une question en statistique à classer et en sens de tri, ou à répondre NONE quand ce n'est pas un classement ; il
-  PEUT produire, si nécessaire, des chiffres et du texte affiché. Aucun classement ne vient de lui : il vient
-  toujours du SQL.
-- Mode libre : pour une question qui n'est pas un classement (le tool `rank` répond NONE), le
-  modèle PEUT rédiger une réponse courte en texte, à ces conditions :
+- Le modèle de langage (Claude ou un autre modèle du projet) est consulté en priorité pour toute saisie qui n'est
+  pas un nom de joueur ou d'équipe : il l'interprète librement et PEUT produire, si nécessaire, des chiffres et du
+  texte affiché. Aucun classement ne vient de lui : il vient toujours du SQL, par le tool de lecture
+  `rank(scope, metric, order)`.
+- Le modèle rédige une réponse courte en texte, en appelant autant de fois que nécessaire les tools de lecture
+  (`metrics`, `rank`, `stat`, `matches`, `find`, `player_report`, `team_report`, `calculate`), à ces conditions :
   - il ne s'appuie QUE sur les résultats de tools de lecture exécutés par l'application (mêmes fonctions et mêmes
     vues SQL que le serveur MCP) ; aucun SQL libre, aucune écriture ;
   - il NE DOIT citer que des nombres et des noms renvoyés par ces tools, ne rien inventer ; il PEUT faire des
     calculs à partir d'eux si nécessaire, et DOIT signaler les données fictives (principe VI) ;
   - la réponse DOIT être présentée comme « réponse libre du LLM », distincte d'un classement calculé, et
     jamais comme un résultat vérifié ;
-  - le nombre d'allers-retours et le nombre d'appels par minute DOIVENT être plafonnés ;
+  - le nombre d'allers-retours par saisie DOIT être plafonné ; aucun plafond d'appels par minute n'est imposé ;
   - chaque échange (LLM, tool, SQL, MCP) DOIT être tracé, dans les journaux et dans l'interface (la trace contient
     la question saisie ; elle est désactivable).
-- L'application DOIT fonctionner sans clé d'API (reconnaissance par mots-clés et suggestions ; le mode libre est
-  alors indisponible). La clé reste côté serveur, en variable d'environnement, et n'est jamais commitée.
+- L'application DOIT fonctionner sans clé d'API (recherche d'un joueur ou d'une équipe par son nom et suggestions
+  cliquables ; l'assistant est alors indisponible). La clé reste côté serveur, en variable d'environnement, et n'est jamais commitée.
 - Les serveurs MCP (statsfoot, PostgreSQL) sont en lecture seule.
 
 Justification : un classement doit être vérifiable en relançant sa requête ; un modèle de
-langage peut inventer des chiffres. Le mode libre répond à des questions qui ne sont pas des classements,
-au prix d'une réponse non garantie : elle est donc bornée aux résultats de lecture, étiquetée et tracée.
+langage peut inventer des chiffres. L'assistant répond à toute question sur les données, au prix
+d'une réponse non garantie : elle est donc bornée aux résultats de lecture, étiquetée et tracée.
 
 ## Contraintes techniques
 
@@ -233,4 +250,4 @@ au prix d'une réponse non garantie : elle est donc bornée aux résultats de le
   vérifier le respect des principes ; toute dérogation DOIT être justifiée dans la section
   « Complexity Tracking » du plan.
 
-**Version**: 2.1.0 | **Ratified**: 2026-10-20 | **Last Amended**: 2026-10-22
+**Version**: 2.2.0 | **Ratified**: 2026-10-20 | **Last Amended**: 2026-10-22
