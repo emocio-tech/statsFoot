@@ -1,8 +1,12 @@
 <!--
 Sync Impact Report
-- Version change: 1.1.2 → 2.0.0 (MAJEUR : redéfinition du principe VII, qui n'interdit plus au modèle de
-  langage de rédiger une réponse contenant des chiffres, sous conditions)
+- Version change: 2.0.0 → 2.0.1 (PATCH : titre du principe VII aligné sur son contenu)
+  (1.1.2 → 2.0.0, MAJEUR : redéfinition du principe VII, qui n'interdit plus au modèle de langage de rédiger
+  une réponse contenant des chiffres, sous conditions)
 - Modified principles:
+  - VII. Titre « Les chiffres viennent du SQL ; le modèle de langage ne les produit pas » remplacé par « Les
+    classements viennent du SQL ; le modèle de langage est borné et tracé » : le modèle peut produire chiffres
+    et texte, mais jamais le classement du catalogue, et reste borné et tracé
   - VII. Les chiffres viennent du SQL : devient « ... ; le modèle de langage ne les produit pas ». Le tool `rank`
     garde son rôle (traduire une question en critère ; le modèle peut produire si nécessaire chiffres et texte
     affiché, le classement du catalogue venant toujours du SQL). Nouveau mode libre : pour une question
@@ -131,7 +135,7 @@ et lançable en une commande.
 Justification : les stats détaillées sont inventées ; les présenter comme réelles fausserait
 toute analyse.
 
-### VII. Les chiffres viennent du SQL ; le modèle de langage ne les produit pas
+### VII. Les classements viennent du SQL ; le modèle de langage est borné et tracé
 
 - Les critères d'analyse forment un catalogue fermé, défini une seule fois côté backend ; le
   Tool, le serveur MCP, l'API et l'interface DOIVENT tous s'appuyer sur ce catalogue.
@@ -209,4 +213,4 @@ au prix d'une réponse non garantie : elle est donc bornée aux résultats de le
   vérifier le respect des principes ; toute dérogation DOIT être justifiée dans la section
   « Complexity Tracking » du plan.
 
-**Version**: 2.0.0 | **Ratified**: 2026-10-20 | **Last Amended**: 2026-10-22
+**Version**: 2.0.1 | **Ratified**: 2026-10-20 | **Last Amended**: 2026-10-22
