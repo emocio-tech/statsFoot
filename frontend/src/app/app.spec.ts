@@ -1,3 +1,6 @@
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { Title } from '@angular/platform-browser';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { App } from './app';
@@ -13,5 +16,13 @@ describe('App', () => {
   it('should create the app', () => {
     const fixture = TestBed.createComponent(App);
     expect(fixture.componentInstance).toBeTruthy();
+  });
+
+  it('nav shows Search and Compare links with the right hrefs', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const links: HTMLAnchorElement[] = Array.from(fixture.nativeElement.querySelectorAll('nav a'));
+    expect(links.map((a) => a.textContent?.trim())).toEqual(['Search', 'Compare']);
+    expect(links.map((a) => a.getAttribute('href'))).toEqual(['/', '/compare']);
   });
 });

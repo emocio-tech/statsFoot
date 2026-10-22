@@ -1,0 +1,102 @@
+<main class="page">
+  <h1>Player comparison</h1>
+
+  <form (submit)="$event.preventDefault(); compare()">
+  <div class="pickers">
+    <section>
+      <label [for]="idA">Player A</label>
+      <input [id]="idA" data-testid="name-a" type="text" autocomplete="off" [value]="fieldA().text" (input)="editA($any($event.target).value)" [attr.aria-invalid]="fieldA().error ? true : null" [attr.aria-describedby]="fieldA().error ? idA + '-error' : null" />
+      @if (fieldA().error; as text) {
+        <p class="message" data-testid="error-a" role="alert" [id]="idA + '-error'">{{ text }}</p>
+      }
+      @if (fieldA().candidates.length > 0) {
+        <ul class="candidates" data-testid="candidates-a" aria-label="Matching players for A">
+          @for (player of fieldA().candidates; track player.id) {
+            <li>
+              <button type="button" class="row" data-testid="candidate-row" (click)="chooseA(player)">{{ player.name }} ({{ player.teamName }})</button>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+    <section>
+      <label [for]="idB">Player B</label>
+      <input [id]="idB" data-testid="name-b" type="text" autocomplete="off" [value]="fieldB().text" (input)="editB($any($event.target).value)" [attr.aria-invalid]="fieldB().error ? true : null" [attr.aria-describedby]="fieldB().error ? idB + '-error' : null" />
+      @if (fieldB().error; as text) {
+        <p class="message" data-testid="error-b" role="alert" [id]="idB + '-error'">{{ text }}</p>
+      }
+      @if (fieldB().candidates.length > 0) {
+        <ul class="candidates" data-testid="candidates-b" aria-label="Matching players for B">
+          @for (player of fieldB().candidates; track player.id) {
+            <li>
+              <button type="button" class="row" data-testid="candidate-row" (click)="chooseB(player)">{{ player.name }} ({{ player.teamName }})</button>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  </div>
+
+  <button type="submit" class="compare" data-testid="compare-button">Compare</button>
+  </form>
+
+  @if (message(); as text) {
+    <p class="message" data-testid="message" role="status">{{ text }}</p>
+  }
+
+  @if (report(); as r) {
+    <div class="comparison" data-testid="comparison">
+      <div class="identities">
+        <div data-testid="identity-a">
+          <strong>{{ r.playerA.name }}</strong>
+          <span>{{ r.playerA.teamName }} ({{ r.playerA.teamCode }})</span>
+          <span>{{ roleLabel(r.playerA.role) }}</span>
+        </div>
+        <div data-testid="identity-b">
+          <strong>{{ r.playerB.name }}</strong>
+          <span>{{ r.playerB.teamName }} ({{ r.playerB.teamCode }})</span>
+          <span>{{ roleLabel(r.playerB.role) }}</span>
+        </div>
+      </div>
+
+      @if (r.roleWarning; as warning) {
+        <p class="message" data-testid="role-warning">{{ warning }}</p>
+      }
+
+      <p class="summary" data-testid="summary">
+        {{ r.playerA.name }} {{ r.summary.leadsA }} / {{ r.summary.ties }} tied / {{ r.summary.leadsB }} {{ r.playerB.name }}
+      </p>
+      <p class="verdict" data-testid="verdict">{{ r.verdict }}</p>
+
+      <ul class="lines">
+        @for (line of r.lines; track line.key) {
+          <li class="line" data-testid="line">
+            <span class="label">{{ line.label }}</span>
+            <span class="value value-a">{{ line.available && line.valueA !== null ? line.valueA : 'not available' }}</span>
+            <span class="value value-b">{{ line.available && line.valueB !== null ? line.valueB : 'not available' }}</span>
+            @if (differenceText(line); as diff) {
+              <span class="difference" data-testid="difference">{{ diff }}</span>
+            }
+            @if (hasBar(line)) {
+              <div class="bar">
+                <div class="half half-a">
+                  @if (line.leader === 'A') {
+                    <span class="bar-a" data-testid="bar-a" [style.width.%]="gapPercent(line)"></span>
+                  }
+                </div>
+                <div class="half half-b">
+                  @if (line.leader === 'B') {
+                    <span class="bar-b" data-testid="bar-b" [style.width.%]="gapPercent(line)"></span>
+                  }
+                </div>
+                @if (line.leader === 'TIE') {
+                  <span class="bar-tie" data-testid="bar-tie"></span>
+                }
+              </div>
+            }
+          </li>
+        }
+      </ul>
+    </div>
+  }
+</main>

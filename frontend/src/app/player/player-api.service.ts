@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { PlayerProfile, PlayerSearchResult } from './player.models';
+import { PlayerComparison, PlayerProfile, PlayerSearchResult } from './player.models';
 
 @Injectable({ providedIn: 'root' })
 export class PlayerApiService {
@@ -10,6 +10,12 @@ export class PlayerApiService {
   search(name: string): Observable<PlayerSearchResult> {
     return this.http.get<PlayerSearchResult>('/api/players', {
       params: new HttpParams().set('name', name),
+    });
+  }
+
+  compare(idA: number, idB: number): Observable<PlayerComparison> {
+    return this.http.get<PlayerComparison>('/api/players/compare', {
+      params: new HttpParams().set('playerA', idA).set('playerB', idB),
     });
   }
 

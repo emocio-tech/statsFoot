@@ -33,6 +33,43 @@ export interface PlayerStats {
   ratingWeighted: number | null;
 }
 
+export type PlayerRole = 'GOALKEEPER' | 'OUTFIELD_PLAYER';
+
+export type Leader = 'A' | 'B' | 'TIE';
+
+export interface ComparedPlayer {
+  id: number;
+  name: string;
+  teamName: string;
+  teamCode: string;
+  role: PlayerRole;
+}
+
+export interface ComparisonLine {
+  key: string;
+  label: string;
+  valueA: number | null;
+  valueB: number | null;
+  difference: number | null;
+  leader: Leader | null;
+  available: boolean;
+}
+
+export interface ComparisonSummary {
+  leadsA: number;
+  leadsB: number;
+  ties: number;
+}
+
+export interface PlayerComparison {
+  playerA: ComparedPlayer;
+  playerB: ComparedPlayer;
+  lines: ComparisonLine[];
+  summary: ComparisonSummary;
+  roleWarning: string | null;
+  verdict: string;
+}
+
 export interface PlayerProfile {
   id: number;
   name: string;

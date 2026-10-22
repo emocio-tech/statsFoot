@@ -19,7 +19,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import stats_foot.stats_foot.player.controller.PlayerController;
 import stats_foot.stats_foot.player.exception.InvalidSearchException;
 import stats_foot.stats_foot.player.exception.PlayerDataUnavailableException;
+import stats_foot.stats_foot.player.exception.ComparisonPlayerNotFoundException;
 import stats_foot.stats_foot.player.exception.PlayerNotFoundException;
+import stats_foot.stats_foot.player.exception.SamePlayerComparisonException;
+import stats_foot.stats_foot.player.service.PlayerComparisonService;
 import stats_foot.stats_foot.player.service.PlayerService;
 
 @WebMvcTest(PlayerController.class)
@@ -30,6 +33,9 @@ class ApiExceptionHandlerTest {
 
 	@MockitoBean
 	private PlayerService playerService;
+
+	@MockitoBean
+	private PlayerComparisonService playerComparisonService;
 
 	@Test
 	void invalidSearchGivesBadRequest() throws Exception {
@@ -81,6 +87,55 @@ class ApiExceptionHandlerTest {
 		mockMvc.perform(get("/api/players"))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.error").value("Please enter a player name."));
+	}
+
+	@Test
+	void samePlayerComparisonGivesBadRequest() throws Exception {
+		when(playerComparisonService.compare(anyInt(), anyInt())).thenThrow(new SamePlayerComparisonException());
+		mockMvc.perform(get("/api/players/compare").param("playerA", "1").param("playerB", "1"))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().json("{\"error\":\"The two players must be different.\"}", true));
+	}
+
+	@Test
+	void unknownPlayerAGivesNamedNotFound() throws Exception {
+		when(playerComparisonService.compare(anyInt(), anyInt()))
+				.thenThrow(new ComparisonPlayerNotFoundException("Player A not found."));
+		mockMvc.perform(get("/api/players/compare").param("playerA", "999999").param("playerB", "2"))
+				.andExpect(status().isNotFound())
+				.andExpect(content().json("{\"error\":\"Player A not found.\"}", true));
+	}
+
+	@Test
+	void unknownPlayerBGivesNamedNotFound() throws Exception {
+		when(playerComparisonService.compare(anyInt(), anyInt()))
+				.thenThrow(new ComparisonPlayerNotFoundException("Player B not found."));
+		mockMvc.perform(get("/api/players/compare").param("playerA", "1").param("playerB", "999999"))
+				.andExpect(status().isNotFound())
+				.andExpect(content().json("{\"error\":\"Player B not found.\"}", true));
+	}
+
+	@Test
+	void missingPlayerBGivesBadRequest() throws Exception {
+		mockMvc.perform(get("/api/players/compare").param("playerA", "1"))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().json("{\"error\":\"Both playerA and playerB are required.\"}", true));
+	}
+
+	@Test
+	void nonNumericPlayerAGivesBadRequest() throws Exception {
+		mockMvc.perform(get("/api/players/compare").param("playerA", "abc").param("playerB", "2"))
+				.andExpect(status().isBadRequest())
+				.andExpect(content().json("{\"error\":\"Player ids must be integers.\"}", true));
+	}
+
+	@Test
+	void unavailableDataOnComparisonGivesServiceUnavailable() throws Exception {
+		when(playerComparisonService.compare(anyInt(), anyInt()))
+				.thenThrow(new PlayerDataUnavailableException("x", new RuntimeException("y")));
+		mockMvc.perform(get("/api/players/compare").param("playerA", "1").param("playerB", "2"))
+				.andExpect(status().isServiceUnavailable())
+				.andExpect(content().json("{\"error\":\"Player data is currently unavailable.\"}", true));
 	}
 
 }
