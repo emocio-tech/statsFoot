@@ -1,27 +1,10 @@
 <main class="page">
   <h1>Player profile search</h1>
 
-  <form class="search" data-testid="search-form" (submit)="onSubmit($event, nameInput.value)">
-    <label for="player-name">Player name</label>
-    <input id="player-name" #nameInput data-testid="name-input" type="text" autocomplete="off" />
-    <button type="submit" data-testid="search-button">Search</button>
-  </form>
+  <app-player-picker (searchStarted)="onSearchStarted()" (playerSelected)="openProfile($event)" />
 
   @if (message(); as text) {
     <p class="message" data-testid="message" role="status">{{ text }}</p>
-  }
-
-  @if (results().length > 0) {
-    <ul class="results" data-testid="results">
-      @for (player of results(); track player.id) {
-        <li>
-          <button type="button" class="row" data-testid="result-row" (click)="openProfile(player.id)">
-            <span class="player-name">{{ player.name }}</span>
-            <span>{{ player.teamName }} ({{ player.teamCode }})</span>
-          </button>
-        </li>
-      }
-    </ul>
   }
 
   @if (profile(); as current) {

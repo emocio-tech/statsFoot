@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { PlayerApiService } from './player-api.service';
-import { PlayerProfile, PlayerSearchResult } from './player.models';
+import { PlayerComparison, PlayerProfile, PlayerSearchResult } from './player.models';
 
 const SEARCH_RESULT: PlayerSearchResult = {
   total: 1,
@@ -62,6 +62,27 @@ describe('PlayerApiService', () => {
 
     expect(result).toEqual(PROFILE);
     expect(result?.stats.ratingWeighted).toBeNull();
+  });
+
+  it('compare_sendsGetWithParams', () => {
+    const comparison: PlayerComparison = {
+      playerA: { id: 1, name: 'Raul RANGEL', teamName: 'Mexico', teamCode: 'MEX', role: 'GOALKEEPER' },
+      playerB: { id: 2, name: 'Other PLAYER', teamName: 'Brazil', teamCode: 'BRA', role: 'OUTFIELD_PLAYER' },
+      lines: [],
+      summary: { leadsA: 0, leadsB: 0, ties: 0 },
+      roleWarning: null,
+      verdict: 'Level.',
+    };
+    let result: PlayerComparison | undefined;
+    service.compare(1, 2).subscribe((r) => (result = r));
+
+    const req = http.expectOne((r) => r.url === '/api/players/compare');
+    expect(req.request.method).toBe('GET');
+    expect(req.request.params.get('playerA')).toBe('1');
+    expect(req.request.params.get('playerB')).toBe('2');
+    req.flush(comparison);
+
+    expect(result).toEqual(comparison);
   });
 
   const errorCases: [number, string][] = [

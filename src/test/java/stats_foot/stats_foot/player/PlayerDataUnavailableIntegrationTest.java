@@ -139,4 +139,31 @@ class PlayerDataUnavailableIntegrationTest {
 
 	}
 
+	@Nested
+	@SpringBootTest
+	@AutoConfigureMockMvc
+	class MissingDataFileOnComparison {
+
+		@TempDir
+		static Path tempDir;
+
+		@Autowired
+		private MockMvc mockMvc;
+
+		@DynamicPropertySource
+		static void database(DynamicPropertyRegistry registry) {
+			String url = uniqueMemoryUrl("missingfilecompare");
+			registry.add("spring.datasource.url", () -> url);
+			registry.add("statsfoot.data-file", () -> tempDir.resolve("does-not-exist.json").toString());
+		}
+
+		@Test
+		void compareAnswers503() throws Exception {
+			for (int i = 0; i < 2; i++) {
+				assertUnavailable(mockMvc, tempDir, "/api/players/compare?playerA=1&playerB=2");
+			}
+		}
+
+	}
+
 }
