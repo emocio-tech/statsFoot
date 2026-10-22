@@ -4,6 +4,9 @@ import com.emocio.analysefoot.tools.StatTools.Row;
 import com.emocio.analysefoot.tools.StatTools.StatResult;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import com.emocio.analysefoot.dto.MatchSummary;
+import com.emocio.analysefoot.service.RatingQueryService;
+import java.time.OffsetDateTime;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -11,6 +14,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /** Les tools stat et calculate du mode libre : calcul exact, agrégats, filtres, listes fermées. */
 class StatToolsTest {
@@ -21,7 +25,8 @@ class StatToolsTest {
             new Row("Lamine YAMAL", "Spain", BigDecimal.valueOf(6)),
             new Row("Gardien SANS BUT", "Spain", null));
 
-    private final StatTools tools = new StatTools(mock(JdbcClient.class));
+    private final RatingQueryService ratings = mock(RatingQueryService.class);
+    private final StatTools tools = new StatTools(mock(JdbcClient.class), ratings);
 
     @Test
     void calculatesExactlyWithPrecedenceAndParentheses() {
@@ -88,9 +93,26 @@ class StatToolsTest {
     }
 
     @Test
-    void exposesTheTwoTools() {
+    void exposesTheThreeTools() {
         assertThat(java.util.Arrays.stream(tools.statToolsProvider().getToolCallbacks()).map(t -> t.getToolDefinition().name()))
-                .containsExactlyInAnyOrder("stat", "calculate");
+                .containsExactlyInAnyOrder("stat", "calculate", "matches");
+    }
+
+    private static MatchSummary match(int id, String stage, String team1, String team2) {
+        return new MatchSummary(id, stage, null, OffsetDateTime.parse("2026-06-11T19:00:00Z"), "Stade", "Ville", 1, team1, 2,
+                team2, 2, 1, false, null, null, null, null);
+    }
+
+    @Test
+    void matchesAreFilteredByTeamAndStageAndLimited() {
+        when(ratings.findMatches()).thenReturn(List.of(match(1, "GROUP", "France", "Spain"),
+                match(2, "GROUP", "Brazil", "France"), match(3, "FINAL", "Spain", "Brazil")));
+
+        assertThat(tools.matches("france", null, null)).extracting(MatchSummary::id).containsExactly(1, 2);
+        assertThat(tools.matches(null, "final", null)).extracting(MatchSummary::id).containsExactly(3);
+        assertThat(tools.matches("spain", "GROUP", null)).extracting(MatchSummary::id).containsExactly(1);
+        assertThat(tools.matches(null, null, 1)).hasSize(1);
+        assertThatThrownBy(() -> tools.matches(null, "QUARTER", null)).hasMessageContaining("Phase inconnue");
     }
 
     private static StatResult agg(String aggregate, String team, String name) {

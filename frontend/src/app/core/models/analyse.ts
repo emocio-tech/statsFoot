@@ -25,9 +25,9 @@ export interface RankedEntry {
   valueLabel: string | null;
 }
 
-/** Comment une question libre a été comprise : par les mots-clés ou par l'assistant (tool Claude rank). */
+/** Comment une saisie a été comprise : par un nom de joueur ou d'équipe, ou par l'assistant LLM. */
 export interface AnalyseInterpretation {
-  source: 'KEYWORDS' | 'ASSISTANT';
+  source: 'NAME' | 'KEYWORDS' | 'ASSISTANT';
   understoodAs: string | null;
 }
 

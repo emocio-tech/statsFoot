@@ -1,14 +1,13 @@
 package com.emocio.analysefoot.mcp;
 
-import com.emocio.analysefoot.analyse.AnalyseCriterion;
 import com.emocio.analysefoot.analyse.AnalyseService;
 import com.emocio.analysefoot.analyse.Trace;
 import com.emocio.analysefoot.dto.AnalyseAnswer;
-import com.emocio.analysefoot.dto.AnalyseQuestion;
 import com.emocio.analysefoot.dto.PlayerReport;
 import com.emocio.analysefoot.dto.RankedEntry;
 import com.emocio.analysefoot.dto.TeamReport;
 import com.emocio.analysefoot.service.ReportQueryService;
+import com.emocio.analysefoot.tools.StatMetrics;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
@@ -16,10 +15,10 @@ import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 /**
  * Serveur MCP « statsfoot » (lecture seule) : les mêmes fonctions que l'API, adossées au même catalogue et aux mêmes
@@ -41,23 +40,31 @@ public class StatsFootMcp {
         return MethodToolCallbackProvider.builder().toolObjects(this).build();
     }
 
-    @Tool(description = "Liste les questions du catalogue de l'onglet Analyse (identifiant, libellé, portée joueur ou équipe, "
-            + "donnée fictive ou non). Les identifiants servent à l'outil rank.")
-    public List<AnalyseQuestion> questions() {
-        return traced("questions", "", analyseService::questions, r -> r.size() + " question(s)");
+    /** Une statistique disponible : portée, nom à passer aux outils rank et stat, libellé, donnée fictive ou non. */
+    public record MetricInfo(String scope, String metric, String label, boolean fictitious) {
     }
 
-    @Tool(description = "Classement (top 5, ex aequo gardés) d'une question du catalogue, avec le ou les vainqueurs, la "
-            + "règle appliquée et l'indication de données fictives.")
-    public AnalyseAnswer rank(@ToolParam(description = "Identifiant d'une question, voir l'outil questions (ex. TOP_SCORER)")
-                              String criterion) {
-        return traced("rank", "criterion=" + criterion, () -> {
-            AnalyseCriterion found = Arrays.stream(AnalyseCriterion.values())
-                    .filter(c -> c.name().equalsIgnoreCase(criterion)).findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException("Question inconnue : " + criterion
-                            + ". Voir l'outil questions."));
-            return analyseService.answer(found);
-        }, r -> r.status() + ", " + r.top().size() + " ligne(s)");
+    @Tool(description = "Liste les statistiques de joueur (PLAYER) et d'équipe (TEAM) disponibles, avec leur libellé et "
+            + "l'indication de donnée fictive. Les noms servent aux outils rank et stat.")
+    public List<MetricInfo> metrics() {
+        return traced("metrics", "", () -> Stream.of(true, false)
+                .flatMap(players -> StatMetrics.names(players).stream().map(m -> new MetricInfo(players ? "PLAYER" : "TEAM",
+                        m, StatMetrics.label(players, m), StatMetrics.isFictitious(m))))
+                .toList(), r -> r.size() + " statistique(s)");
+    }
+
+    @Tool(description = "Classement d'une statistique de joueur ou d'équipe (top 5, ex aequo gardés) avec le ou les "
+            + "vainqueurs, la règle appliquée et l'indication de données fictives. scope PLAYER ou TEAM, metric parmi "
+            + "l'outil metrics (ex. goals, corners, goal_difference), order DESC (défaut, du plus grand) ou ASC.")
+    public AnalyseAnswer rank(
+            @ToolParam(description = "PLAYER ou TEAM") String scope,
+            @ToolParam(description = "Statistique à classer, voir l'outil metrics (ex. goals, yellow_cards, points)") String metric,
+            @ToolParam(description = "DESC (défaut, du plus grand) ou ASC", required = false) String order) {
+        return traced("rank", "scope=" + scope + ", metric=" + metric + ", order=" + order,
+                () -> analyseService.answerGeneric(scope == null ? "" : scope.trim().toUpperCase(),
+                        metric == null ? "" : metric.trim().toLowerCase(),
+                        order == null || order.isBlank() ? "DESC" : order.trim().toUpperCase()),
+                r -> r.status() + ", " + r.top().size() + " ligne(s)");
     }
 
     @Tool(description = "Recherche un joueur (nom et/ou prénom) ou une équipe (appellation) de la dernière compétition "

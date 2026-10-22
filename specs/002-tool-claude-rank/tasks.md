@@ -189,6 +189,7 @@ Task: "AssistantRateLimiter et son test"
 ## Notes
 
 - Aucune migration, aucun changement de `donneesStats.sql` (le hook PreToolUse sur les migrations n'est pas sollicité).
-- Pour une question du catalogue, le modèle ne choisit qu'un identifiant et le classement vient du SQL ; le mode
+- Le modèle ne choisit qu'une statistique de la liste fermée et un sens de tri (Amendement du 2026-10-22 (constitution 2.1.0) : rank sans critères) ;
+  le classement vient du SQL ; le mode
   libre (amendement du 2026-10-22 (constitution 2.0.0), constitution VII) peut rédiger une réponse courte étiquetée, calculs permis.
 - Aucune requête payante dans la suite de tests par défaut.

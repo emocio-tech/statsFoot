@@ -1,11 +1,11 @@
 package com.emocio.analysefoot.analyse;
 
-/** Interprète utilisé sans clé LLM_KEY : aucune interprétation, aucun appel externe. */
+/** Assistant utilisé sans clé LLM_KEY : aucune réponse, aucun appel externe. */
 public class DisabledQuestionInterpreter implements QuestionInterpreter {
 
     @Override
-    public Interpretation interpret(String question) {
-        return Interpretation.none(Interpretation.Source.ASSISTANT);
+    public String answerFreely(String question) {
+        return null;
     }
 
     @Override

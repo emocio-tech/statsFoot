@@ -1,4 +1,12 @@
-# Phase 1 – Modèle de données : Tool Claude rank(criterion, scope)
+# Phase 1 – Modèle de données : Tool rank(scope, metric, order)
+
+> **Amendement 2 du 2026-10-22 (constitution 2.2.0) : les sections 1 et 2 sont historiques.** Il n'y a plus d'entrée de tool à valider ni d'objet
+> `Interpretation` : le modèle appelle directement des tools de lecture exécutés par l'application (voir
+> `README.md`, « Tools de l'assistant »). Le flux devient : nom de joueur ou d'équipe → rapport ; sinon assistant LLM →
+> texte (`FREE_TEXT`) ; sinon suggestions (`NOT_RECOGNIZED`). Le plafond d'usage de la section 5 est supprimé.
+>
+> Amendement du 2026-10-22 (constitution 2.1.0) : les sections 1 et 2 ci-dessous décrivent désormais `rank(scope, metric, order)` ; l'entrée à
+> `criterion` et `alternatives` n'existe plus pour le modèle.
 
 Aucune table ni migration : la fonctionnalité ne stocke rien (spec, hypothèses). Elle ajoute des objets
 en mémoire et un champ à la réponse de l'onglet Analyse.
@@ -7,11 +15,11 @@ en mémoire et un champ à la réponse de l'onglet Analyse.
 
 | Champ | Type | Règle |
 |-------|------|-------|
-| `criterion` | énumération : `TOP_SCORER`, `TOP_ASSIST`, `MOST_YELLOW_CARDS`, `LEAST_FAIR_PLAY_PLAYER`, `BEST_TEAM`, `TOP_SCORING_TEAM`, `LEAST_FAIR_PLAY_TEAM`, `MOST_FAIR_PLAY_PLAYER`, `NONE` | Requis. Les 8 valeurs viennent de `AnalyseCriterion` (jamais recopiées à la main). |
-| `scope` | `PLAYER` \| `TEAM` \| `UNKNOWN` | Requis. Doit correspondre à la portée de `criterion` ; sinon l'entrée est rejetée. |
-| `alternatives` | liste de 0 à 8 identifiants du catalogue | Requis (vide sauf ambiguïté). Doublons et `NONE` interdits. |
+| `scope` | `PLAYER` \| `TEAM` \| `UNKNOWN` | Requis. Doit correspondre à la portée de `metric` ; `UNKNOWN` avec `NONE`. |
+| `metric` | énumération : toutes les statistiques de `StatMetrics` (joueur et équipe, ex. `goals`, `corners`, `goal_difference`), plus `NONE` | Requis. Les valeurs viennent de `StatMetrics` (jamais recopiées à la main). `NONE` : la question n'est pas un classement (mode libre). |
+| `order` | `DESC` \| `ASC` | Requis. `DESC` du plus grand au plus petit, `ASC` du plus petit au plus grand. |
 
-Validation côté serveur (FR-004) : schéma strict + contrôle des identifiants et de la cohérence de portée ;
+Validation côté serveur (FR-004) : schéma strict + contrôle de la statistique et de la cohérence de portée ;
 tout écart → « aucune interprétation ».
 
 ## 2. Interprétation (objet interne)
@@ -19,8 +27,10 @@ tout écart → « aucune interprétation ».
 | Champ | Valeurs |
 |-------|---------|
 | `outcome` | `RECOGNIZED`, `AMBIGUOUS`, `NONE` |
-| `criterion` | identifiant retenu (si `RECOGNIZED`) |
-| `alternatives` | identifiants proposés (si `AMBIGUOUS`) |
+| `criterion` | question du catalogue retenue par les mots-clés (si `RECOGNIZED` par les mots-clés) |
+| `alternatives` | questions proposées (si `AMBIGUOUS`, mots-clés seulement) |
+| `generic` | classement choisi par l'assistant : `scope`, `metric`, `order` (si `RECOGNIZED` par l'assistant) |
+| `unrelated` | vrai si l'assistant a répondu `NONE` : question hors classement, mode libre possible |
 | `source` | `KEYWORDS` ou `ASSISTANT` |
 
 Transitions dans `AnalyseService.answer(question)` :
@@ -30,9 +40,9 @@ mots-clés ── reconnue ─────────────────�
           └─ non reconnue / ambiguë ─▶ assistant activé et sous le plafond ?
                                          ├─ non ──────────────▶ résultat des mots-clés
                                          └─ oui ─▶ appel (3 s)
-                                                  ├─ critère valide ─▶ RECOGNIZED (ASSISTANT)
-                                                  ├─ ambiguïté ──────▶ AMBIGUOUS (ASSISTANT)
-                                                  └─ NONE / échec ───▶ résultat des mots-clés
+                                                  ├─ statistique valide ─▶ RECOGNIZED (ASSISTANT, generic)
+                                                  ├─ NONE ───────────────▶ mode libre (constitution VII)
+                                                  └─ échec ──────────────▶ résultat des mots-clés
 ```
 
 ## 3. Réponse de l'API (ajout compatible)

@@ -1,4 +1,15 @@
-# Contrat : Tool Claude rank(criterion, scope)
+# Contrat : Tool rank(scope, metric, order)
+
+> **Amendement 2 du 2026-10-22 (constitution 2.2.0) : l'appel décrit ci-dessous n'existe plus.** Le tool `rank` n'est plus imposé au modèle
+> (`tool_choice` vaut toujours `auto`), les tools de lecture sont exécutés par l'application et leurs résultats
+> renvoyés au modèle (jusqu'à 6 appels), le délai est de 20 s (`LLM_TIMEOUT`), `max_tokens` vaut 400 au moins, et les
+> propriétés `max-per-minute` et `tool-choice` sont supprimées. La réponse de `GET /api/analyse?q=` porte `status`
+> (`FOUND`, `CHOOSE`, `FREE_TEXT`, `NOT_RECOGNIZED`), `text` et `interpretation.source` (`NAME` ou `ASSISTANT`).
+>
+> Amendement du 2026-10-22 (constitution 2.1.0) : la définition du tool (§2) est désormais `rank(scope, metric, order)`. Le modèle choisit une
+> statistique de la liste fermée `StatMetrics` et un sens de tri, ou `NONE`. Une réponse générique a pour `question.id`
+> `GENERIC:{PLAYER|TEAM}:{metric}:{DESC|ASC}`. Le `rank` du serveur MCP accepte `criterion` ou `scope` + `metric` +
+> `order`.
 
 ## 1. Routes de l'application
 
@@ -36,7 +47,7 @@ que si `enabled` est vrai.
 |---------|--------|
 | Modèle | `claude-sonnet-4-6` (configurable ; `nova-lite` n'appelle pas le tool) |
 | `max_tokens` | 200 pour le proxy, qui réserve ce plafond dans son quota (réponse d'environ 75 jetons) ; `max_completion_tokens` 1024 pour Bedrock (le raisonnement de gpt-oss compte dedans) |
-| `system` | texte fixe : rôle (choisir une question du catalogue), les 8 questions (identifiant, libellé, portée, ce qu'elles mesurent), règle `NONE` hors catalogue, règle d'ambiguïté |
+| `system` | texte fixe : rôle (choisir une statistique à classer et un sens), les statistiques de joueur et d'équipe (nom et libellé), règles de choix et de tri, règle `NONE` hors classement |
 | `messages` | un message système (consignes) et un message utilisateur : la question saisie, telle quelle (jamais traitée comme un modèle de texte) |
 | `tools` | un tool `function` `rank` (voir ci-dessous) ; jamais exécuté par Spring AI |
 | `tool_choice` | `{ "type": "function", "function": { "name": "rank" } }` (`auto` si `LLM_TOOL_CHOICE=auto`) |
@@ -50,20 +61,22 @@ Définition du tool (format OpenAI ; le schéma est le même qu'avec le format A
   "type": "function",
   "function": {
     "name": "rank",
-    "description": "Choisit la question du catalogue de l'onglet Analyse qui correspond à la question du visiteur. Ne calcule rien : les réponses sont calculées par l'application.",
+    "description": "Choisit la statistique de joueur ou d'équipe à classer pour répondre à la question du visiteur, et le sens du tri. Ne calcule rien : le classement est calculé par l'application.",
     "parameters": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["criterion", "scope", "alternatives"],
+      "required": ["scope", "metric", "order"],
       "properties": {
-        "criterion": { "type": "string", "enum": ["TOP_SCORER", "TOP_ASSIST", "MOST_YELLOW_CARDS", "LEAST_FAIR_PLAY_PLAYER", "BEST_TEAM", "TOP_SCORING_TEAM", "LEAST_FAIR_PLAY_TEAM", "MOST_FAIR_PLAY_PLAYER", "NONE"] },
         "scope": { "type": "string", "enum": ["PLAYER", "TEAM", "UNKNOWN"] },
-        "alternatives": { "type": "array", "items": { "type": "string", "enum": ["TOP_SCORER", "TOP_ASSIST", "MOST_YELLOW_CARDS", "LEAST_FAIR_PLAY_PLAYER", "BEST_TEAM", "TOP_SCORING_TEAM", "LEAST_FAIR_PLAY_TEAM", "MOST_FAIR_PLAY_PLAYER"] } }
+        "metric": { "type": "string", "enum": ["matches_played", "matches_started", "minutes_played", "goals", "...", "final_position", "NONE"] },
+        "order": { "type": "string", "enum": ["DESC", "ASC"] }
       }
     }
   }
 }
 ```
+
+(`metric` liste toutes les statistiques de `StatMetrics` ; `...` abrège ici la liste.)
 
 Lecture de la réponse : `choices[0].message.tool_calls` doit contenir un appel nommé `rank` dont `arguments` (chaîne JSON)
 est validé par le serveur (data-model §1). Tout autre cas (texte seul, arguments illisibles, erreur HTTP, délai

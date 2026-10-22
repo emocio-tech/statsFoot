@@ -96,14 +96,21 @@ F=backend/src/main/resources/db/migration/donneesStats.sql
 Les stats détaillées et les passes décisives sont inventées (cohérentes avec les matchs réels) : l'interface
 les signale par un astérisque et la mention « données fictives ».
 
-### Assistant d'interprétation (tool `rank`, Spring AI)
+### Assistant LLM de l'onglet Analyse (Spring AI)
 
-Quand les mots-clés ne reconnaissent pas une question libre de l'onglet Analyse (ou la jugent ambiguë), le backend
-peut la faire interpréter par un LLM, via le `ChatClient` de Spring AI (format OpenAI Chat Completions) et un
-unique tool `rank(criterion, scope)`. Le modèle ne fait que choisir une des 8 questions du catalogue (ou aucune) ;
-le tool n'est jamais exécuté et les chiffres viennent toujours du SQL. Seule la question saisie est transmise ;
-elle n'est journalisée que par la trace des échanges (voir ci-dessous ; `ANALYSE_TRACE=false` la désactive), sinon seuls le nombre de jetons et le type d'une erreur le sont. Délai de 3 s, aucune
-nouvelle tentative, repli silencieux sur les mots-clés.
+La recherche de l'onglet Analyse se passe ainsi :
+1. le nom d'un joueur ou d'une équipe (nom et/ou prénom) affiche son rapport complet ;
+2. **toute autre saisie est confiée en priorité au LLM**, via le `ChatClient` de Spring AI (format OpenAI Chat
+   Completions). Il l'interprète librement et y répond en enchaînant les tools de lecture, que l'application exécute
+   (lecture seule, SQL) : `metrics`, `rank`, `stat`, `find`, `player_report`, `team_report`, `matches`, `calculate`
+   (voir plus bas). Sa réponse courte s'affiche en gras (statut `FREE_TEXT`) ;
+3. sans clé LLM, ou si le modèle n'aboutit pas, les 8 questions suggérées sont proposées (clic). Elles ne servent plus à
+   interpréter une saisie : il n'y a plus de reconnaissance par mots-clés.
+
+Aucun plafond d'appels par minute ; seul garde-fou : 6 allers et retours LLM, tool au plus par saisie. Seule la question
+saisie est transmise au modèle (aucune donnée de visiteur) ; elle n'est journalisée que par la trace des échanges (voir
+plus bas ; `ANALYSE_TRACE=false` la désactive), sinon seuls le nombre de jetons et le type d'une erreur le sont. Délai de
+20 s par appel, aucune nouvelle tentative.
 
 Deux fournisseurs, choisis par `LLM_PROVIDER` :
 - `proxy` (défaut) : le LLM du projet, `claude-sonnet-4-6` sur le proxy LiteLLM de l'équipe ;
@@ -123,16 +130,13 @@ java -jar backend/target/analyse-foot.jar
 | `LLM_PROVIDER` | `proxy` | `proxy` ou `bedrock` |
 | `LLM_KEY` | (vide) | clé du proxy ; vide → assistant désactivé |
 | `LLM_BASE_URL` | `https://g3jnmn4dyf.eu-west-3.awsapprunner.com` | adresse du proxy (Spring AI ajoute `/v1/chat/completions`) |
-| `LLM_MODEL` | `claude-sonnet-4-6` | modèle (doit savoir appeler un tool imposé ; `nova-lite` ne le sait pas) |
-| `LLM_MAX_TOKENS` | `200` | plafond de la réponse ; le proxy le réserve dans son quota |
-| `LLM_MAX_PER_MINUTE` | `1` | plafond d'appels par minute ; le proxy limite la clé à 1 000 jetons par minute et un appel en consomme environ 1 600 : à relever avec la limite de la clé |
-| `LLM_TOOL_CHOICE` | `forced` | `forced` (tool imposé) ou `auto` |
+| `LLM_MODEL` | `claude-sonnet-4-6` | modèle (doit savoir appeler des tools ; `nova-lite` ne le sait pas) |
+| `LLM_TIMEOUT` | `20s` | délai d'un appel au modèle (plusieurs par saisie) |
+| `LLM_MAX_TOKENS` | `400` | plafond de la réponse ; le proxy le réserve dans son quota (400 au minimum) |
 | `AWS_BEARER_TOKEN_BEDROCK` | (vide) | jeton Bedrock (fournisseur `bedrock`) ; vide → assistant désactivé |
 | `BEDROCK_BASE_URL` | `https://bedrock-runtime.us-west-2.amazonaws.com/openai` | adresse Bedrock |
 | `BEDROCK_MODEL` | `openai.gpt-oss-120b-1:0` | modèle Bedrock |
 | `BEDROCK_MAX_TOKENS` | `1024` | envoyé en `max_completion_tokens` (le raisonnement de gpt-oss y compte) |
-| `BEDROCK_TOOL_CHOICE` | `forced` | `forced` ou `auto`, si le modèle refuse de se voir imposer un tool |
-| `BEDROCK_MAX_PER_MINUTE` | `30` | plafond d'appels par minute (Bedrock) |
 
 Une variable d'environnement reste prioritaire sur le fichier `.env`.
 
@@ -140,10 +144,8 @@ Une variable d'environnement reste prioritaire sur le fichier `.env`.
 |---|---|
 | `GET /api/analyse/assistant` | `{"enabled": true\|false}` : assistant configuré ou non |
 
-La réponse de `GET /api/analyse?q=...` indique `interpretation.source` (`KEYWORDS` ou `ASSISTANT`) et
-`interpretation.understoodAs`. Évaluation réelle (50 requêtes) :
-`LLM_KEY=... ./mvnw -pl backend test -Dtest=AssistantEvalTest -Danalyse.assistant.eval=true
--Danalyse.assistant.eval.pause-seconds=62` (le quota du proxy impose cette pause : près d'une heure).
+La réponse de `GET /api/analyse?q=...` porte `status` (`FOUND`, `CHOOSE`, `FREE_TEXT`, `NOT_RECOGNIZED`), `text` (la
+réponse du LLM pour `FREE_TEXT`) et `interpretation.source` (`NAME` ou `ASSISTANT`).
 
 ### Serveur MCP « statsfoot » (lecture seule)
 
@@ -153,8 +155,8 @@ requêtes et mêmes vues que l'API ; les données fictives restent signalées.
 
 | Outil | Rôle |
 |---|---|
-| `questions` | les questions du catalogue (identifiant, libellé, portée, fictif) |
-| `rank(criterion)` | classement d'une question : vainqueurs, top 5, règle, fictif |
+| `metrics` | les statistiques de joueur et d'équipe disponibles (nom, libellé, fictif) |
+| `rank(scope, metric, order)` | classement d'une statistique : vainqueurs, top 5 avec ex aequo, règle, fictif |
 | `find(name)` | recherche d'un joueur (nom et/ou prénom) ou d'une équipe : identifiants |
 | `player_report(playerId)` | rapport complet d'un joueur |
 | `team_report(teamId)` | rapport complet d'une équipe |
@@ -209,23 +211,24 @@ Le front est alors servi sur http://localhost:4200.
 ### Trace des échanges (logs et interface)
 
 Chaque recherche de l'onglet Analyse journalise (logger `analyse.trace`, niveau INFO) ses échanges, aller (`-->`) et
-retour (`<--`), entre l'appli, le LLM, le tool `rank`, le SQL et les clients MCP, puis les renvoie dans le champ `trace`
+retour (`<--`), entre l'appli, le LLM, ses tools de lecture, le SQL et les clients MCP, puis les renvoie dans le champ `trace`
 de la réponse : l'interface les affiche sous le résultat (« Échanges de la recherche »). Les appels reçus par le serveur
-MCP (`questions`, `rank`, `find`, `player_report`, `team_report`) sont journalisés de la même façon. La trace contient
+MCP (`metrics`, `rank`, `find`, `player_report`, `team_report`) sont journalisés de la même façon. La trace contient
 la question saisie ; `ANALYSE_TRACE=false` la supprime des journaux et de la réponse.
 
-### Mode libre : tools `stat` et `calculate`
+### Tools de l'assistant : `stat`, `matches`, `calculate` et `rank`
 
-Quand le tool `rank` juge une question sans rapport avec le catalogue (y compris un total, une moyenne, un écart ou une
-valeur pour un joueur ou une équipe nommé), le LLM la traite lui-même en enchaînant des tools de lecture, en plusieurs
-allers-retours, puis rédige une réponse courte affichée en gras (statut `FREE_TEXT`) :
+Le LLM choisit lui-même, saisie par saisie, quels tools enchaîner, en plusieurs allers-retours :
 
 | Tool | Rôle |
 |---|---|
-| `stat(scope, metric, aggregate, name, team, order, limit)` | lit une statistique de joueur ou d'équipe des vues du tournoi : liste classée, `SUM`, `AVG`, `MAX`, `MIN`, `COUNT`, filtrée par nom ou par équipe ; statistique choisie dans une liste fermée (pas de SQL libre) ; signale les données fictives |
+| `metrics` | liste les statistiques de joueur et d'équipe disponibles (liste fermée `StatMetrics`) |
+| `rank(scope, metric, order)` | classe les joueurs ou les équipes sur une statistique : `RANK()` en SQL, ex aequo conservés, top 5 ; plus aucun critère prédéfini |
+| `stat(scope, metric, aggregate, name, team, order, limit)` | lit une statistique : liste classée, `SUM`, `AVG`, `MAX`, `MIN`, `COUNT`, filtrée par nom ou par équipe ; statistique choisie dans une liste fermée (pas de SQL libre) ; signale les données fictives |
+| `matches(team, stage, limit)` | les matchs : date, phase, groupe, stade, équipes, score (prolongation, tirs au but), notes |
+| `find`, `player_report`, `team_report` | identité et rapport complet d'un joueur ou d'une équipe |
 | `calculate(expression)` | arithmétique exacte (`+ - * / %`, parenthèses), sans variable ni fonction |
-| `find`, `player_report`, `team_report`, `rank`, `questions` | les tools du serveur MCP, réutilisés tels quels |
 
 Ex. : « de combien de pour cent Mbappé a-t-il marqué plus de buts que Yamal ? » donne `stat` (Mbappé), `stat` (Yamal),
-puis `calculate`. Ce mode demande plusieurs appels LLM par question : relever `LLM_MAX_PER_MINUTE` (6 dans `.env`).
-`stat` et `calculate` sont aussi exposés par le serveur MCP (lecture seule).
+puis `calculate`. Tous sont aussi exposés par le serveur MCP, en lecture seule. Les 8 questions de l'enum
+`AnalyseCriterion` ne servent plus qu'aux suggestions cliquables de l'interface.

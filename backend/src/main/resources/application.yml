@@ -13,7 +13,7 @@ spring:
         version: 1.0.0
         type: SYNC
         instructions: >
-          Statistiques du tournoi (dernière compétition importée), en lecture seule. Outils : questions, rank, find,
+          Statistiques du tournoi (dernière compétition importée), en lecture seule. Outils : metrics, rank, find,
           player_report, team_report. Les chiffres viennent de la base ; les données marquées fictives le sont.
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/analysefoot}
@@ -29,11 +29,13 @@ spring:
 server:
   port: 8080
 
-# Assistant d'interprétation des questions libres (tool rank) par le ChatClient de Spring AI, format OpenAI, au
-# choix du fournisseur LLM_PROVIDER :
+# Assistant LLM de l'onglet Analyse (ChatClient de Spring AI, format OpenAI) : il interprète librement toute saisie qui n'est
+# pas un nom de joueur ou d'équipe, avec les tools de lecture (metrics, rank, stat, find, player_report, team_report, matches,
+# calculate) exécutés par l'application. Fournisseur au choix de LLM_PROVIDER :
 #  - proxy (défaut) : LLM du projet, proxy LiteLLM de l'équipe, clé LLM_KEY ;
 #  - bedrock : Amazon Bedrock (gpt-oss), jeton AWS_BEARER_TOKEN_BEDROCK.
 # Désactivé sans clé. Les clés se donnent dans le fichier .env ou en variable d'environnement, jamais dans le dépôt.
+# Aucun plafond d'appels par minute (au plus 6 allers et retours LLM, tool par saisie).
 analyse:
   assistant:
     provider: ${LLM_PROVIDER:proxy}
@@ -41,21 +43,15 @@ analyse:
     api-key: ${LLM_KEY:}
     base-url: ${LLM_BASE_URL:https://g3jnmn4dyf.eu-west-3.awsapprunner.com}
     model: ${LLM_MODEL:claude-sonnet-4-6}
-    timeout: ${LLM_TIMEOUT:3s}
-    # Le proxy réserve max_tokens dans son quota (1 000 jetons par minute pour cette clé, fenêtre fixe) et un appel
-    # en consomme environ 1 600 : un seul appel par minute passe. À relever avec la limite de la clé.
-    max-tokens: ${LLM_MAX_TOKENS:200}
-    max-per-minute: ${LLM_MAX_PER_MINUTE:1}
-    # forced : tool_choice imposé sur rank ; auto : si le modèle refuse de se voir imposer un tool
-    tool-choice: ${LLM_TOOL_CHOICE:forced}
+    # délai d'un appel au modèle (plusieurs par saisie)
+    timeout: ${LLM_TIMEOUT:20s}
+    max-tokens: ${LLM_MAX_TOKENS:400}
     bedrock:
       api-key: ${AWS_BEARER_TOKEN_BEDROCK:}
       base-url: ${BEDROCK_BASE_URL:https://bedrock-runtime.us-west-2.amazonaws.com/openai}
       model: ${BEDROCK_MODEL:openai.gpt-oss-120b-1:0}
-      tool-choice: ${BEDROCK_TOOL_CHOICE:forced}
       # gpt-oss raisonne : ses jetons de réflexion comptent dans ce plafond
       max-tokens: ${BEDROCK_MAX_TOKENS:1024}
-      max-per-minute: ${BEDROCK_MAX_PER_MINUTE:30}
 
 # Trace des échanges (appli, LLM, tool rank, MCP, SQL) : journalisée (logger analyse.trace) et renvoyée à l'interface.
 # Elle contient la question saisie : mettre ANALYSE_TRACE=false pour ne plus la journaliser.

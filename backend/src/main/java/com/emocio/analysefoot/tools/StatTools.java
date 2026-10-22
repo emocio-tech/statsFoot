@@ -1,6 +1,7 @@
 package com.emocio.analysefoot.tools;
 
-import com.emocio.analysefoot.analyse.QuestionMatcher;
+import com.emocio.analysefoot.dto.MatchSummary;
+import com.emocio.analysefoot.service.RatingQueryService;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
@@ -14,10 +15,8 @@ import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 
 /**
@@ -32,39 +31,22 @@ public class StatTools {
     static final int DEFAULT_LIMIT = 5;
     static final int MAX_LIMIT = 20;
 
-    /** Statistiques de joueur (colonnes de v_player_tournament_stats). */
-    static final List<String> PLAYER_METRICS = List.of("matches_played", "matches_started", "minutes_played", "goals",
-            "penalty_goals", "own_goals", "decisive_goals", "assists", "yellow_cards", "red_cards", "second_yellows",
-            "direct_reds", "fair_play_points", "fouls_committed", "free_kicks_won", "free_kicks_conceded", "duels_won",
-            "duels_lost", "corners", "offsides", "distance_km", "man_of_the_match_count", "rating", "rating_weighted");
-
-    /** Statistiques d'équipe : nom exposé, expression SQL (colonnes de v_team_tournament_stats, plus l'écart de buts). */
-    static final Map<String, String> TEAM_METRICS = new LinkedHashMap<>();
-
-    static {
-        for (String m : List.of("matches_played", "wins", "draws", "losses", "points", "goals_for", "goals_against")) {
-            TEAM_METRICS.put(m, m);
-        }
-        TEAM_METRICS.put("goal_difference", "goals_for - goals_against");
-        for (String m : List.of("yellow_cards", "red_cards", "fair_play_points", "fouls_committed", "free_kicks_won",
-                "free_kicks_conceded", "duels_won", "duels_lost", "corners", "offsides", "distance_km", "rating",
-                "final_position")) {
-            TEAM_METRICS.put(m, m);
-        }
-    }
-
-    /** Statistiques détaillées inventées (partie 6 de donneesStats.sql) et passes décisives : données FICTIVES. */
-    static final Set<String> FICTITIOUS = Set.of("assists", "fouls_committed", "free_kicks_won", "free_kicks_conceded",
-            "duels_won", "duels_lost", "corners", "offsides", "distance_km", "man_of_the_match_count");
+    static final List<String> STAGES = List.of("GROUP", "ROUND_OF_32", "ROUND_OF_16", "QUARTER_FINAL", "SEMI_FINAL",
+            "THIRD_PLACE", "FINAL");
+    static final int MAX_MATCHES = 104;
 
     static final List<String> AGGREGATES = List.of("NONE", "SUM", "AVG", "MAX", "MIN", "COUNT");
 
     private static final String COMPETITION = "competition_id = (SELECT MAX(id) FROM competition)";
 
-    private final JdbcClient jdbcClient;
+    private static final int MATCHES_DEFAULT_LIMIT = 20;
 
-    public StatTools(JdbcClient jdbcClient) {
+    private final JdbcClient jdbcClient;
+    private final RatingQueryService ratingQueryService;
+
+    public StatTools(JdbcClient jdbcClient, RatingQueryService ratingQueryService) {
         this.jdbcClient = jdbcClient;
+        this.ratingQueryService = ratingQueryService;
     }
 
     @Bean
@@ -107,10 +89,10 @@ public class StatTools {
             throw new IllegalArgumentException("scope inconnu : " + scope + " (PLAYER ou TEAM).");
         }
         String key = metric == null ? "" : metric.trim().toLowerCase(Locale.ROOT);
-        String expression = players ? (PLAYER_METRICS.contains(key) ? key : null) : TEAM_METRICS.get(key);
+        String expression = StatMetrics.expression(players, key);
         if (expression == null) {
             throw new IllegalArgumentException("Statistique inconnue : " + metric + ". Disponibles : "
-                    + String.join(", ", players ? PLAYER_METRICS : TEAM_METRICS.keySet()) + ".");
+                    + String.join(", ", StatMetrics.names(players)) + ".");
         }
         String agg = aggregate == null || aggregate.isBlank() ? "NONE" : aggregate.trim().toUpperCase(Locale.ROOT);
         if (!AGGREGATES.contains(agg)) {
@@ -136,6 +118,28 @@ public class StatTools {
         return Calculator.evaluate(expression).toPlainString();
     }
 
+    @Tool(description = "Liste les matchs du tournoi, par ordre chronologique : date, phase (GROUP, ROUND_OF_32, ROUND_OF_16, "
+            + "QUARTER_FINAL, SEMI_FINAL, THIRD_PLACE, FINAL), groupe, stade et ville, équipes, score final (prolongation "
+            + "comprise, extraTime vrai si elle a eu lieu), tirs au but et note de chaque équipe. team ne garde que les "
+            + "matchs de cette équipe, stage que ceux de cette phase (accents et casse ignorés pour team) ; limit : "
+            + "20 par défaut, 104 au plus. Sert aux questions sur un score, un vainqueur, un stade ou un calendrier.")
+    public List<MatchSummary> matches(
+            @ToolParam(description = "Nom (ou début de nom) d'une des deux équipes", required = false) String team,
+            @ToolParam(description = "Phase : GROUP, ROUND_OF_32, ROUND_OF_16, QUARTER_FINAL, SEMI_FINAL, THIRD_PLACE ou FINAL",
+                    required = false) String stage,
+            @ToolParam(description = "Nombre de matchs, 20 par défaut, 104 au plus", required = false) Integer limit) {
+        String wanted = stage == null || stage.isBlank() ? null : stage.trim().toUpperCase(Locale.ROOT);
+        if (wanted != null && !STAGES.contains(wanted)) {
+            throw new IllegalArgumentException("Phase inconnue : " + stage + " (" + String.join(", ", STAGES) + ").");
+        }
+        int max = limit == null || limit < 1 ? MATCHES_DEFAULT_LIMIT : Math.min(limit, MAX_MATCHES);
+        return ratingQueryService.findMatches().stream()
+                .filter(m -> wanted == null || wanted.equals(m.stage()))
+                .filter(m -> team == null || team.isBlank() || matches(m.team1(), team) || matches(m.team2(), team))
+                .limit(max)
+                .toList();
+    }
+
     /** Filtre, trie et agrège des lignes déjà lues ; sans accès à la base, pour être testé seul. */
     static StatResult compute(String scope, String metric, String aggregate, List<Row> all, String name, String team,
                               String order, Integer limit) {
@@ -144,7 +148,7 @@ public class StatTools {
                 .filter(r -> matches(r.team(), team))
                 .toList());
         int considered = rows.size();
-        boolean fictitious = FICTITIOUS.contains(metric);
+        boolean fictitious = StatMetrics.isFictitious(metric);
         String note = fictitious ? "données fictives" : null;
         if ("NONE".equals(aggregate)) {
             // valeurs inconnues toujours en fin de liste, quel que soit le sens du tri
@@ -179,8 +183,8 @@ public class StatTools {
         if (value == null) {
             return false;
         }
-        List<String> valueWords = Arrays.asList(QuestionMatcher.normalize(value).split(" "));
-        return Arrays.stream(QuestionMatcher.normalize(filter).split(" "))
+        List<String> valueWords = Arrays.asList(TextNormalizer.normalize(value).split(" "));
+        return Arrays.stream(TextNormalizer.normalize(filter).split(" "))
                 .allMatch(w -> valueWords.stream().anyMatch(v -> v.equals(w) || (w.length() >= 2 && v.startsWith(w))));
     }
 }

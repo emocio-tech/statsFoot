@@ -55,7 +55,7 @@ journalisée sauf par la trace des échanges (désactivable, ANALYSE_TRACE=false
 | IV. API = contrat | ajout compatible `interpretation` dans `AnalyseAnswer` ; nouvelle route `GET /api/analyse/assistant` testée et ajoutée au README | ✅ | ✅ |
 | V. Simplicité, branche unique | seule dépendance ajoutée : le SDK Anthropic, explicitement prévu par la constitution ; plafond et délai sans bibliothèque ; commits sur `initDonneesNotation` | ✅ | ✅ |
 | VI. Origine des données | aucune nouvelle donnée ; les mentions « données fictives » existantes sont conservées | ✅ | ✅ |
-| VII. Chiffres du SQL | le modèle ne choisit qu'un identifiant du catalogue fermé (énumération stricte) ; pour une question du catalogue, aucun classement ne vient du modèle (mode libre hors catalogue : voir la constitution 2.0.0, réponse courte étiquetée, calculs permis, tracée) ; fonctionne sans clé (mots-clés) ; clé côté serveur en variable d'environnement | ✅ | ✅ |
+| VII. Chiffres du SQL | Amendement 2 du 2026-10-22 (constitution 2.2.0) : le modèle appelle des tools de lecture exécutés par l'application (classements en SQL) ; le modèle ne choisit qu'une statistique d'une liste fermée et un sens de tri (énumération stricte ; Amendement du 2026-10-22 (constitution 2.1.0), rank sans critères) ; pour une question du catalogue, aucun classement ne vient du modèle (mode libre hors catalogue : voir la constitution 2.0.0, réponse courte étiquetée, calculs permis, tracée) ; fonctionne sans clé (mots-clés) ; clé côté serveur en variable d'environnement | ✅ | ✅ |
 
 Aucune dérogation : la section Complexity Tracking est vide.
 

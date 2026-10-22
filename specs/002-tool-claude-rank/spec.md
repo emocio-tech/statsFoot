@@ -1,10 +1,30 @@
-# Feature Specification: Tool Claude rank(criterion, scope)
+# Feature Specification: Tool rank(scope, metric, order)
 
 **Feature Branch**: `initDonneesNotation` (branche unique, constitution V ; dossier de spécification `002-tool-claude-rank`)
 
 **Created**: 2026-10-21
 
 **Status**: Draft
+
+> **Amendement du 2026-10-22 (constitution 2.1.0) : le tool `rank` n'a plus de critères prédéfinis.** Il s'appelle désormais
+> `rank(scope, metric, order)` : le modèle choisit une statistique de joueur ou d'équipe dans la liste fermée
+> `StatMetrics` (la même que le tool `stat`) et un sens de tri, ou répond `metric = NONE` quand la question n'est pas un
+> classement (mode libre). Le classement est calculé en SQL (`RANK()`, ex aequo conservés, top 5) par
+> `AnalyseService.answerGeneric`. Les huit questions du catalogue restent la voie des mots-clés et des suggestions de
+> l'interface, avec leurs règles de départage ; le MCP `rank` accepte `criterion` ou `scope` + `metric` + `order`.
+> Là où ce document parle de « choisir une question du catalogue », de `criterion` ou d'`alternatives` pour le
+> modèle, lire : choisir une statistique et un sens de tri (le modèle ne peut plus déclarer d'ambiguïté ; elle ne
+> vient que des mots-clés). Les exigences ci-dessous restent valables pour le reste (consultation seulement quand les
+> mots-clés échouent, repli, délai, plafond, confidentialité).
+
+> **Amendement 2 du 2026-10-22 (constitution 2.2.0) : le LLM est le point d'entrée de la recherche.** Il n'y a plus de reconnaissance par
+> mots-clés, plus de tri préalable par un appel `rank` imposé, plus de `NONE` ni d'ambiguïté déclarée par le modèle, et
+> plus de plafond d'appels par minute (FR-003 et FR-005 ci-dessous sont remplacées par ce qui suit). Une saisie qui n'est
+> pas un nom de joueur ou d'équipe est confiée au LLM, qui l'interprète librement et enchaîne les tools de lecture
+> (`metrics`, `rank(scope, metric, order)`, `stat`, `matches`, `find`, `player_report`, `team_report`, `calculate`)
+> exécutés par l'application ; sa réponse courte s'affiche en gras (statut `FREE_TEXT`). `rank` est un tool de lecture
+> comme les autres. Sans clé, ou si le modèle n'aboutit pas, les 8 questions suggérées sont proposées. Garde-fou :
+> 6 allers et retours LLM, tool au plus par saisie ; délai de 20 s par appel.
 
 **Input**: User description: "le tool Claude rank(criterion, scope)" — étape 5 du cadrage
 (backend/src/main/resources/db/migration/cadrage.txt), reportée par la clarification Q3 de
@@ -127,9 +147,9 @@ par l'assistant, et vérifier l'affichage de l'interprétation et de son origine
 
 ### Functional Requirements
 
-- **FR-001**: L'assistant MUST se limiter à choisir une question du catalogue (et sa portée
-  joueur ou équipe), à déclarer une ambiguïté entre plusieurs questions, ou à n'en choisir
-  aucune ; pour la réponse à une question du catalogue, aucun classement ne vient de lui (amendement du 2026-10-22 (constitution 2.0.0) : une
+- **FR-001**: L'assistant MUST se limiter à choisir une statistique de joueur ou d'équipe de la liste fermée et un
+  sens de tri (Amendement du 2026-10-22 (constitution 2.1.0) ; initialement : une question du catalogue, une ambiguïté ou aucune), ou à répondre
+  NONE ; pour la réponse à une question du catalogue, aucun classement ne vient de lui (amendement du 2026-10-22 (constitution 2.0.0) : une
   question sans rapport avec le catalogue peut être traitée par le mode libre, réponse courte étiquetée à partir
   de tools de lecture, calculs permis ; voir la constitution, principe VII).
 - **FR-002**: Toute réponse obtenue via l'assistant MUST provenir du même calcul que la
@@ -137,15 +157,15 @@ par l'assistant, et vérifier l'affichage de l'interprétation et de son origine
 - **FR-003**: L'assistant MUST être consulté seulement quand les mots-clés ne reconnaissent
   pas la question ou la jugent ambiguë ; une question reconnue par les mots-clés MUST
   recevoir sa réponse sans consulter l'assistant.
-- **FR-004**: Un choix de l'assistant qui ne correspond à aucune question du catalogue, ou une
-  réponse illisible, MUST être ignoré au profit des mots-clés.
+- **FR-004**: Un choix de l'assistant qui ne correspond à aucune statistique de la liste ou dont la portée est
+  incohérente, ou une réponse illisible, MUST être ignoré au profit des mots-clés.
 - **FR-005**: Sans assistant configuré, en cas d'erreur ou au-delà d'un délai de 3 secondes,
   l'application MUST appliquer la reconnaissance par mots-clés, sans message d'erreur
   technique pour le visiteur.
 - **FR-006**: La réponse MUST indiquer comment la question a été comprise et par quel moyen
   (mots-clés ou assistant).
 - **FR-007**: La question saisie MUST être la seule donnée transmise à l'assistant, avec la
-  liste des questions du catalogue ; aucune donnée du tournoi ni information sur le
+  liste des statistiques ; aucune donnée du tournoi ni information sur le
   visiteur n'est transmise.
 - **FR-008**: Une mention permanente sous la barre de recherche MUST informer le visiteur
   qu'une question libre non reconnue peut être transmise à un service externe (Anthropic)
@@ -166,11 +186,13 @@ par l'assistant, et vérifier l'affichage de l'interprétation et de son origine
 
 ### Key Entities *(include if feature involves data)*
 
-- **Interprétation** : question saisie, question du catalogue retenue (ou ambiguïté, ou
-  aucune), origine (mots-clés ou assistant).
-- **Catalogue des questions** : les huit questions existantes de l'onglet Analyse, avec leur
-  identifiant, leur libellé et leur portée ; il reste la seule liste que l'assistant peut
-  choisir.
+- **Interprétation** : question saisie, question du catalogue retenue par les mots-clés (ou ambiguïté, ou aucune),
+  ou classement générique choisi par l'assistant (portée, statistique, sens), origine (mots-clés ou assistant).
+- **Catalogue des questions** : les huit questions existantes de l'onglet Analyse, avec leur identifiant, leur
+  libellé et leur portée ; elles servent aux mots-clés et aux suggestions (Amendement du 2026-10-22 (constitution 2.1.0) : l'assistant ne les
+  choisit plus).
+- **Statistiques** : la liste fermée des statistiques de joueur et d'équipe (`StatMetrics`) que l'assistant peut
+  choisir, avec leur expression SQL sur les vues du tournoi.
 
 ## Success Criteria *(mandatory)*
 

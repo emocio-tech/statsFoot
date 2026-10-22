@@ -35,7 +35,7 @@ interface TopRow {
       <button type="submit">Rechercher</button>
     </form>
     @if (assistant().enabled) {
-      <p class="notice muted">Une question non reconnue peut être transmise au LLM du projet (Claude via le proxy de l'équipe) pour être interprétée.</p>
+      <p class="notice muted">Toute saisie qui n'est pas un nom de joueur ou d'équipe est transmise au LLM du projet (Claude via le proxy de l'équipe), qui l'interprète et y répond à partir des données.</p>
     }
 
     @if (request() !== null) {
@@ -58,7 +58,7 @@ interface TopRow {
             <p class="free-text"><strong>{{ a.text }}</strong></p>
             <p class="muted free-note">Réponse libre du LLM, à partir des outils de lecture de la base (question hors catalogue).</p>
           } @else if (a.status === 'NOT_RECOGNIZED') {
-            <p>Question non reconnue. Essayez plutôt l'une de ces questions :</p>
+            <p>Question non comprise. Essayez plutôt l'une de ces questions :</p>
             <nav class="suggestions">
               @for (c of a.candidates; track c.id) {
                 <button type="button" (click)="choose(c.id)">{{ c.label }}</button>
