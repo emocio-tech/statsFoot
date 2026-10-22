@@ -213,3 +213,19 @@ retour (`<--`), entre l'appli, le LLM, le tool `rank`, le SQL et les clients MCP
 de la réponse : l'interface les affiche sous le résultat (« Échanges de la recherche »). Les appels reçus par le serveur
 MCP (`questions`, `rank`, `find`, `player_report`, `team_report`) sont journalisés de la même façon. La trace contient
 la question saisie ; `ANALYSE_TRACE=false` la supprime des journaux et de la réponse.
+
+### Mode libre : tools `stat` et `calculate`
+
+Quand le tool `rank` juge une question sans rapport avec le catalogue (y compris un total, une moyenne, un écart ou une
+valeur pour un joueur ou une équipe nommé), le LLM la traite lui-même en enchaînant des tools de lecture, en plusieurs
+allers-retours, puis rédige une réponse courte affichée en gras (statut `FREE_TEXT`) :
+
+| Tool | Rôle |
+|---|---|
+| `stat(scope, metric, aggregate, name, team, order, limit)` | lit une statistique de joueur ou d'équipe des vues du tournoi : liste classée, `SUM`, `AVG`, `MAX`, `MIN`, `COUNT`, filtrée par nom ou par équipe ; statistique choisie dans une liste fermée (pas de SQL libre) ; signale les données fictives |
+| `calculate(expression)` | arithmétique exacte (`+ - * / %`, parenthèses), sans variable ni fonction |
+| `find`, `player_report`, `team_report`, `rank`, `questions` | les tools du serveur MCP, réutilisés tels quels |
+
+Ex. : « de combien de pour cent Mbappé a-t-il marqué plus de buts que Yamal ? » donne `stat` (Mbappé), `stat` (Yamal),
+puis `calculate`. Ce mode demande plusieurs appels LLM par question : relever `LLM_MAX_PER_MINUTE` (6 dans `.env`).
+`stat` et `calculate` sont aussi exposés par le serveur MCP (lecture seule).

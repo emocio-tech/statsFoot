@@ -173,8 +173,9 @@ public class AnalyseService {
             Trace.in("LLM", "Erreur de l'assistant", e.getClass().getSimpleName());
             return keywords;
         }
-        if (assistant != null && assistant.unrelated() && keywords.outcome() == Interpretation.Outcome.NONE) {
-            return keywords.asUnrelated();
+        if (assistant != null && assistant.unrelated()) {
+            // le modèle a lu la question en entier : sans rapport avec le catalogue, même si des mots-clés y ressemblent
+            return Interpretation.none(Interpretation.Source.KEYWORDS).asUnrelated();
         }
         return assistant == null || assistant.outcome() == Interpretation.Outcome.NONE ? keywords : assistant;
     }

@@ -18,6 +18,7 @@ import org.springframework.web.client.RestClient;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -79,8 +80,19 @@ public class AssistantConfig {
                 options(model, maxTokens, bedrock, !"auto".equalsIgnoreCase(toolChoice)),
                 chatClient(baseUrl, apiKey, model, freeTimeout),
                 tools -> freeOptions(model, Math.max(maxTokens, FREE_MIN_TOKENS), bedrock, tools),
-                beanFactory == null ? null
-                        : () -> List.of(beanFactory.getBean("statsFootTools", ToolCallbackProvider.class).getToolCallbacks()));
+                beanFactory == null ? null : () -> dataTools(beanFactory));
+    }
+
+    /**
+     * Tools de lecture du mode libre : ceux du serveur MCP (find, player_report...) et les tools stat et calculate,
+     * que le modèle enchaîne librement.
+     */
+    static List<ToolCallback> dataTools(BeanFactory beanFactory) {
+        List<ToolCallback> tools = new ArrayList<>();
+        for (String provider : List.of("statsFootTools", "statToolsProvider")) {
+            tools.addAll(List.of(beanFactory.getBean(provider, ToolCallbackProvider.class).getToolCallbacks()));
+        }
+        return tools;
     }
 
     @Bean

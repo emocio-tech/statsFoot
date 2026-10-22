@@ -77,7 +77,7 @@ public class QuestionMatcher {
     }
 
     /** Minuscules, sans accents, ponctuation remplacée par des espaces, espaces simples. */
-    static String normalize(String text) {
+    public static String normalize(String text) {
         if (text == null) {
             return "";
         }
