@@ -133,7 +133,7 @@ class SchemaScriptTest {
                 views.add(rs.getString(1));
             }
         }
-        assertEquals(List.of("v_player_tournament_stats"), views);
+        assertEquals(new TreeSet<>(List.of("v_player_tournament_stats", "v_team_tournament_stats")), new TreeSet<>(views));
         assertEquals(new TreeSet<>(VIEW_COLUMNS), columnsOf("v_player_tournament_stats"));
     }
 
