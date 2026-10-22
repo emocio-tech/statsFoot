@@ -1,16 +1,22 @@
 package stats_foot.stats_foot.player.tool;
 
+import java.util.List;
+
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
 import stats_foot.stats_foot.player.dto.PlayerComparison;
-import stats_foot.stats_foot.player.dto.PlayerProfile;
+import stats_foot.stats_foot.player.dto.PlayerLookupResult;
 import stats_foot.stats_foot.player.dto.PlayerQueryResult;
 import stats_foot.stats_foot.player.dto.PlayerSearchResult;
+import stats_foot.stats_foot.player.dto.PlayerSummary;
+import stats_foot.stats_foot.player.exception.ComparisonPlayerNotFoundException;
+import stats_foot.stats_foot.player.exception.PlayerNotFoundException;
 import stats_foot.stats_foot.player.model.ComparisonOperator;
 import stats_foot.stats_foot.player.model.PlayerStat;
 import stats_foot.stats_foot.player.service.PlayerComparisonService;
 import stats_foot.stats_foot.player.service.PlayerService;
+import stats_foot.stats_foot.player.util.NameNormalizer;
 
 /** LLM tools exposing the player data, backed by the same service as the /api/players endpoints. */
 @Component
@@ -24,16 +30,27 @@ public class PlayerTools {
 		this.playerComparisonService = playerComparisonService;
 	}
 
-	@Tool(description = "Searches World Cup 2026 players by name (partial, accent-insensitive). "
-			+ "Returns at most 50 matches with their id, name and team. Use it to find a player id.")
-	public PlayerSearchResult searchPlayers(@ToolParam(description = "Full or partial player name") String name) {
-		return playerService.search(name);
-	}
-
-	@Tool(description = "Gets the full World Cup 2026 profile of a player (team, goals, cards, minutes, rating...) "
-			+ "from his id. Call searchPlayers first if the id is unknown.")
-	public PlayerProfile getPlayerProfile(@ToolParam(description = "Player id returned by searchPlayers") int id) {
-		return playerService.getProfile(id);
+	@Tool(description = "Looks up a World Cup 2026 player by full or partial name (accent-insensitive). "
+			+ "Returns his full profile (team, goals, cards, minutes, rating...) when the name identifies one player; "
+			+ "otherwise returns the list of closest names (id, name, team) so you can ask the user which one; "
+			+ "fails if nobody matches.")
+	public PlayerLookupResult searchPlayers(@ToolParam(description = "Full or partial player name") String name) {
+		PlayerSearchResult result = playerService.search(name);
+		List<PlayerSummary> players = result.players();
+		if (players.isEmpty()) {
+			throw new PlayerNotFoundException(PlayerService.NOT_FOUND_MESSAGE);
+		}
+		if (players.size() == 1) {
+			return PlayerLookupResult.ofProfile(playerService.getProfile(players.get(0).id()));
+		}
+		String wanted = NameNormalizer.normalize(name);
+		List<PlayerSummary> exact = players.stream()
+				.filter(p -> NameNormalizer.normalize(p.name()).equals(wanted))
+				.toList();
+		if (exact.size() == 1) {
+			return PlayerLookupResult.ofProfile(playerService.getProfile(exact.get(0).id()));
+		}
+		return PlayerLookupResult.ofCandidates(result);
 	}
 
 	@Tool(description = "Finds World Cup 2026 players from one of their attributes. All parameters are optional and "
@@ -56,12 +73,19 @@ public class PlayerTools {
 				!Boolean.FALSE.equals(descending), limit);
 	}
 
-	@Tool(description = "Compare two Worlds Cup 2026 players and return a report")
+	@Tool(description = "Compare two players and return a report. If a player is not found, "
+			+ "call searchPlayers to check whether he exists and under which name, then retry.")
 	public PlayerComparison comparePlayers(
 		@ToolParam(description = "Full or partial name of first player to compare") String playerA,
 		@ToolParam(description = "Full or partial name of second player to compare") String playerB
 	) {
-		return playerComparisonService.compareByName(playerA, playerB);
+		try {
+			return playerComparisonService.compareByName(playerA, playerB);
+		} catch (ComparisonPlayerNotFoundException e) {
+			throw new ComparisonPlayerNotFoundException(e.getMessage()
+					+ " Call the searchPlayers tool with this player's name to check whether he exists "
+					+ "and get his exact name, then call comparePlayers again.");
+		}
 	}
 
 }
