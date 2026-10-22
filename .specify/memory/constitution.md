@@ -1,5 +1,22 @@
 <!--
 Sync Impact Report
+- Version change: 2.0.1 → 2.1.0 (MINEUR : élargissement notable du principe VII ; le tool `rank` ne s'appuie plus
+  sur le catalogue des 8 questions)
+- Modified principles:
+  - VII. Le tool `rank` devient `rank(scope, metric, order)` : le modèle choisit une statistique dans une liste fermée
+    (`StatMetrics`, partagée avec le tool `stat`) et un sens de tri, ou NONE ; le classement est calculé en SQL
+    (RANK(), ex aequo affichés). Le catalogue des 8 questions (`AnalyseCriterion`) reste la voie des mots-clés et
+    des suggestions de l'interface ; le MCP accepte les deux formes. L'exigence « le Tool, le MCP, l'API et
+    l'interface s'appuient tous sur le même catalogue fermé » devient « sur deux listes fermées : les questions du
+    catalogue et les statistiques ». Les règles de départage propres aux 8 questions ne s'appliquent pas au
+    classement générique (valeur seule, ex aequo affichés)
+- Added/removed sections: aucune
+- Templates requiring updates: aucun modèle ; specs/002-tool-claude-rank mise à jour (rank sans critères)
+- Follow-up TODOs: aucun
+-->
+
+<!--
+Sync Impact Report (précédent)
 - Version change: 2.0.0 → 2.0.1 (PATCH : titre du principe VII aligné sur son contenu)
   (1.1.2 → 2.0.0, MAJEUR : redéfinition du principe VII, qui n'interdit plus au modèle de langage de rédiger
   une réponse contenant des chiffres, sous conditions)
@@ -137,20 +154,23 @@ toute analyse.
 
 ### VII. Les classements viennent du SQL ; le modèle de langage est borné et tracé
 
-- Les critères d'analyse forment un catalogue fermé, défini une seule fois côté backend ; le
-  Tool, le serveur MCP, l'API et l'interface DOIVENT tous s'appuyer sur ce catalogue.
-- Chaque critère DOIT avoir une requête SQL sur les vues du tournoi et une règle d'égalité
-  explicite ; les ex aequo DOIVENT être affichés, jamais cachés.
-- Le modèle de langage (Tool `rank(criterion, scope)` ; Claude ou un autre modèle du projet) sert, pour une
-  question du catalogue, à la traduire en critère ; il PEUT produire, si nécessaire, des chiffres et du texte
-  affiché. Le classement du catalogue, lui, vient toujours du SQL.
-- Mode libre : pour une question sans rapport avec le catalogue (le tool `rank` répond NONE sans alternative), le
+- Deux listes fermées, définies une seule fois côté backend, servent de base au Tool, au serveur MCP, à l'API et à
+  l'interface : les questions du catalogue (`AnalyseCriterion`, utilisées par les mots-clés et les suggestions) et
+  les statistiques de joueur et d'équipe (`StatMetrics`, utilisées par les tools `rank` et `stat`).
+- Chaque question du catalogue et chaque statistique DOIT avoir une requête SQL sur les vues du tournoi ; chaque
+  question du catalogue DOIT avoir une règle d'égalité explicite ; pour un classement générique, la valeur seule
+  départage. Dans tous les cas les ex aequo DOIVENT être affichés, jamais cachés.
+- Le modèle de langage (Tool `rank(scope, metric, order)` ; Claude ou un autre modèle du projet) sert à traduire
+  une question en statistique à classer et en sens de tri, ou à répondre NONE quand ce n'est pas un classement ; il
+  PEUT produire, si nécessaire, des chiffres et du texte affiché. Aucun classement ne vient de lui : il vient
+  toujours du SQL.
+- Mode libre : pour une question qui n'est pas un classement (le tool `rank` répond NONE), le
   modèle PEUT rédiger une réponse courte en texte, à ces conditions :
   - il ne s'appuie QUE sur les résultats de tools de lecture exécutés par l'application (mêmes fonctions et mêmes
     vues SQL que le serveur MCP) ; aucun SQL libre, aucune écriture ;
   - il NE DOIT citer que des nombres et des noms renvoyés par ces tools, ne rien inventer ; il PEUT faire des
     calculs à partir d'eux si nécessaire, et DOIT signaler les données fictives (principe VI) ;
-  - la réponse DOIT être présentée comme « réponse libre du LLM », distincte d'un classement du catalogue, et
+  - la réponse DOIT être présentée comme « réponse libre du LLM », distincte d'un classement calculé, et
     jamais comme un résultat vérifié ;
   - le nombre d'allers-retours et le nombre d'appels par minute DOIVENT être plafonnés ;
   - chaque échange (LLM, tool, SQL, MCP) DOIT être tracé, dans les journaux et dans l'interface (la trace contient
@@ -159,8 +179,8 @@ toute analyse.
   alors indisponible). La clé reste côté serveur, en variable d'environnement, et n'est jamais commitée.
 - Les serveurs MCP (statsfoot, PostgreSQL) sont en lecture seule.
 
-Justification : un résultat du catalogue doit être vérifiable en relançant sa requête ; un modèle de
-langage peut inventer des chiffres. Le mode libre répond à des questions que le catalogue ne couvre pas,
+Justification : un classement doit être vérifiable en relançant sa requête ; un modèle de
+langage peut inventer des chiffres. Le mode libre répond à des questions qui ne sont pas des classements,
 au prix d'une réponse non garantie : elle est donc bornée aux résultats de lecture, étiquetée et tracée.
 
 ## Contraintes techniques
@@ -213,4 +233,4 @@ au prix d'une réponse non garantie : elle est donc bornée aux résultats de le
   vérifier le respect des principes ; toute dérogation DOIT être justifiée dans la section
   « Complexity Tracking » du plan.
 
-**Version**: 2.0.1 | **Ratified**: 2026-10-20 | **Last Amended**: 2026-10-22
+**Version**: 2.1.0 | **Ratified**: 2026-10-20 | **Last Amended**: 2026-10-22
