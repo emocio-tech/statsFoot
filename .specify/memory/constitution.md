@@ -1,5 +1,23 @@
 <!--
 Sync Impact Report
+- Version change: 1.1.2 → 2.0.0 (MAJEUR : redéfinition du principe VII, qui n'interdit plus au modèle de
+  langage de rédiger une réponse contenant des chiffres, sous conditions)
+- Modified principles:
+  - VII. Les chiffres viennent du SQL : devient « ... ; le modèle de langage ne les produit pas ». Le tool `rank`
+    garde son rôle (traduire une question en critère ; le modèle peut produire si nécessaire chiffres et texte
+    affiché, le classement du catalogue venant toujours du SQL). Nouveau mode libre : pour une question
+    hors catalogue, le modèle peut rédiger une courte réponse, mais uniquement à partir des résultats de tools de
+    lecture exécutés par l'application (mêmes fonctions et même SQL que le serveur MCP), avec calculs permis si
+    nécessaire, étiquetée « réponse libre du LLM », bornée en allers-retours et en appels par minute, et tracée (aller/retour visibles dans les journaux
+    et l'interface)
+- Added/removed sections: aucune
+- Templates requiring updates: aucun modèle ; specs/002-tool-claude-rank alignée (plan, research, spec, tasks,
+  contrats) ; README déjà mis à jour
+- Follow-up TODOs: aucun
+-->
+
+<!--
+Sync Impact Report (précédent)
 - Version change: 1.1.0 → 1.1.2 (PATCH : clarifications, aucun principe ajouté ni retiré)
 - Modified principles:
   - V. Simplicité : la dépendance externe de l'assistant est Spring AI (spring-ai-openai, ChatClient), qui
@@ -113,20 +131,33 @@ et lançable en une commande.
 Justification : les stats détaillées sont inventées ; les présenter comme réelles fausserait
 toute analyse.
 
-### VII. Les chiffres viennent du SQL, jamais du modèle de langage
+### VII. Les chiffres viennent du SQL ; le modèle de langage ne les produit pas
 
 - Les critères d'analyse forment un catalogue fermé, défini une seule fois côté backend ; le
   Tool, le serveur MCP, l'API et l'interface DOIVENT tous s'appuyer sur ce catalogue.
 - Chaque critère DOIT avoir une requête SQL sur les vues du tournoi et une règle d'égalité
   explicite ; les ex aequo DOIVENT être affichés, jamais cachés.
-- Le modèle de langage (Tool `rank(criterion, scope)` ; Claude ou un autre modèle du projet) NE DOIT servir qu'à traduire
-  une question libre en critère du catalogue. Il NE DOIT produire aucune statistique.
-- L'application DOIT fonctionner sans clé d'API (reconnaissance par mots-clés et suggestions).
-  La clé reste côté serveur, en variable d'environnement, et n'est jamais commitée.
+- Le modèle de langage (Tool `rank(criterion, scope)` ; Claude ou un autre modèle du projet) sert, pour une
+  question du catalogue, à la traduire en critère ; il PEUT produire, si nécessaire, des chiffres et du texte
+  affiché. Le classement du catalogue, lui, vient toujours du SQL.
+- Mode libre : pour une question sans rapport avec le catalogue (le tool `rank` répond NONE sans alternative), le
+  modèle PEUT rédiger une réponse courte en texte, à ces conditions :
+  - il ne s'appuie QUE sur les résultats de tools de lecture exécutés par l'application (mêmes fonctions et mêmes
+    vues SQL que le serveur MCP) ; aucun SQL libre, aucune écriture ;
+  - il NE DOIT citer que des nombres et des noms renvoyés par ces tools, ne rien inventer ; il PEUT faire des
+    calculs à partir d'eux si nécessaire, et DOIT signaler les données fictives (principe VI) ;
+  - la réponse DOIT être présentée comme « réponse libre du LLM », distincte d'un classement du catalogue, et
+    jamais comme un résultat vérifié ;
+  - le nombre d'allers-retours et le nombre d'appels par minute DOIVENT être plafonnés ;
+  - chaque échange (LLM, tool, SQL, MCP) DOIT être tracé, dans les journaux et dans l'interface (la trace contient
+    la question saisie ; elle est désactivable).
+- L'application DOIT fonctionner sans clé d'API (reconnaissance par mots-clés et suggestions ; le mode libre est
+  alors indisponible). La clé reste côté serveur, en variable d'environnement, et n'est jamais commitée.
 - Les serveurs MCP (statsfoot, PostgreSQL) sont en lecture seule.
 
-Justification : un résultat doit être vérifiable en relançant sa requête ; un modèle de langage
-peut inventer des chiffres.
+Justification : un résultat du catalogue doit être vérifiable en relançant sa requête ; un modèle de
+langage peut inventer des chiffres. Le mode libre répond à des questions que le catalogue ne couvre pas,
+au prix d'une réponse non garantie : elle est donc bornée aux résultats de lecture, étiquetée et tracée.
 
 ## Contraintes techniques
 
@@ -178,4 +209,4 @@ peut inventer des chiffres.
   vérifier le respect des principes ; toute dérogation DOIT être justifiée dans la section
   « Complexity Tracking » du plan.
 
-**Version**: 1.1.2 | **Ratified**: 2026-10-20 | **Last Amended**: 2026-10-21
+**Version**: 2.0.0 | **Ratified**: 2026-10-20 | **Last Amended**: 2026-10-22
