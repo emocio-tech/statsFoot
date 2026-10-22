@@ -5,17 +5,20 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.api.Test;
+import stats_foot.stats_foot.player.dto.PlayerComparison;
 import stats_foot.stats_foot.player.dto.PlayerProfile;
 import stats_foot.stats_foot.player.dto.PlayerQueryResult;
 import stats_foot.stats_foot.player.dto.PlayerSearchResult;
 import stats_foot.stats_foot.player.model.PlayerStat;
+import stats_foot.stats_foot.player.service.PlayerComparisonService;
 import stats_foot.stats_foot.player.service.PlayerService;
 import stats_foot.stats_foot.player.tool.PlayerTools;
 
 class PlayerToolsTest {
 
 	private final PlayerService playerService = mock(PlayerService.class);
-	private final PlayerTools tools = new PlayerTools(playerService);
+	private final PlayerComparisonService playerComparisonService = mock(PlayerComparisonService.class);
+	private final PlayerTools tools = new PlayerTools(playerService, playerComparisonService);
 
 	@Test
 	void searchPlayers_delegatesToService() {
@@ -49,4 +52,11 @@ class PlayerToolsTest {
 		assertSame(profile, tools.getPlayerProfile(7));
 	}
 
+	@Test
+	void comparePlayers_delegatesToService() {
+		PlayerComparison comparison = mock(PlayerComparison.class);
+		when(playerComparisonService.compareByName("mbappe", "haaland")).thenReturn(comparison);
+
+		assertSame(comparison, tools.comparePlayers("mbappe", "haaland"));
+	}
 }

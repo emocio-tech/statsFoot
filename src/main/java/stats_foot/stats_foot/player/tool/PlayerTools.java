@@ -3,11 +3,13 @@ package stats_foot.stats_foot.player.tool;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
+import stats_foot.stats_foot.player.dto.PlayerComparison;
 import stats_foot.stats_foot.player.dto.PlayerProfile;
 import stats_foot.stats_foot.player.dto.PlayerQueryResult;
 import stats_foot.stats_foot.player.dto.PlayerSearchResult;
 import stats_foot.stats_foot.player.model.ComparisonOperator;
 import stats_foot.stats_foot.player.model.PlayerStat;
+import stats_foot.stats_foot.player.service.PlayerComparisonService;
 import stats_foot.stats_foot.player.service.PlayerService;
 
 /** LLM tools exposing the player data, backed by the same service as the /api/players endpoints. */
@@ -15,9 +17,11 @@ import stats_foot.stats_foot.player.service.PlayerService;
 public class PlayerTools {
 
 	private final PlayerService playerService;
+	private final PlayerComparisonService playerComparisonService;
 
-	public PlayerTools(PlayerService playerService) {
+	public PlayerTools(PlayerService playerService, PlayerComparisonService playerComparisonService) {
 		this.playerService = playerService;
+		this.playerComparisonService = playerComparisonService;
 	}
 
 	@Tool(description = "Searches World Cup 2026 players by name (partial, accent-insensitive). "
@@ -50,6 +54,14 @@ public class PlayerTools {
 			@ToolParam(required = false, description = "Maximum number of players returned (default 10, max 50)") Integer limit) {
 		return playerService.query(team, captainsOnly, filterStat, operator, value, sortBy,
 				!Boolean.FALSE.equals(descending), limit);
+	}
+
+	@Tool(description = "Compare two Worlds Cup 2026 players and return a report")
+	public PlayerComparison comparePlayers(
+		@ToolParam(description = "Full or partial name of first player to compare") String playerA,
+		@ToolParam(description = "Full or partial name of second player to compare") String playerB
+	) {
+		return playerComparisonService.compareByName(playerA, playerB);
 	}
 
 }
