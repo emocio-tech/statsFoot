@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import stats_foot.stats_foot.chat.TokenUsageLoggingAdvisor;
 import stats_foot.stats_foot.player.tool.PlayerTools;
+import stats_foot.stats_foot.tool.StatTools;
 import stats_foot.stats_foot.team.tool.TeamTools;
 
 @RestController
@@ -38,6 +39,9 @@ public class ChatController {
             - For information about one team, call searchTeams with its name or FIFA code. If it returns
               a list of names, ask the user which team they mean.
             - To compare two players, call comparePlayers; to compare two teams, call compareTeams.
+            - To rank players or teams by a statistic (ties kept), call rank. To read, sum or average a
+              statistic, call stat. For scores, winners, stadiums or schedule, call matches.
+            - Never compute by yourself: for any sum, difference, average, ratio or percentage, call calculate.
             - Answer in the user's language, concisely.
             - When giving an answer, always include all of the informations that you have about the player(s) or team(s) (team, goals, cards, minutes, wins, points, rating...), and never leave out any of them.
             """;
@@ -46,7 +50,7 @@ public class ChatController {
 
     private final ChatClient chatClient;
 
-    public ChatController(ChatClient.Builder chatClientBuilder, PlayerTools playerTools, TeamTools teamTools) {
+    public ChatController(ChatClient.Builder chatClientBuilder, PlayerTools playerTools, TeamTools teamTools, StatTools statTools) {
         ChatMemory chatMemory = MessageWindowChatMemory.builder().maxMessages(10).build();
         this.chatClient = chatClientBuilder
                 .defaultSystem(SYSTEM_PROMPT)
@@ -54,7 +58,7 @@ public class ChatController {
                         MessageChatMemoryAdvisor.builder(chatMemory).build(),
                         new SimpleLoggerAdvisor(),
                         new TokenUsageLoggingAdvisor(Ordered.LOWEST_PRECEDENCE))
-                .defaultTools(playerTools, teamTools)
+                .defaultTools(playerTools, teamTools, statTools)
                 .build();
     }
 

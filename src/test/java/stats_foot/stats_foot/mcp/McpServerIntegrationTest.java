@@ -33,6 +33,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import stats_foot.stats_foot.player.tool.PlayerTools;
+import stats_foot.stats_foot.tool.StatTools;
 import stats_foot.stats_foot.team.tool.TeamTools;
 
 @SpringBootTest
@@ -64,8 +65,8 @@ class McpServerIntegrationTest {
 				.map(callback -> callback.getToolDefinition().name())
 				.toList();
 
-		Set<String> expectedNames = Stream.concat(Arrays.stream(PlayerTools.class.getDeclaredMethods()),
-						Arrays.stream(TeamTools.class.getDeclaredMethods()))
+		Set<String> expectedNames = Stream.of(PlayerTools.class, StatTools.class)
+				.flatMap(type -> Arrays.stream(type.getDeclaredMethods()))
 				.filter(method -> method.isAnnotationPresent(Tool.class))
 				.map(McpServerIntegrationTest::toolName)
 				.collect(Collectors.toSet());
@@ -75,12 +76,12 @@ class McpServerIntegrationTest {
 	}
 
 	@Test
-	void mcpBeans_onlyOneToolCallbackProvider_exposesSearchAndComparePlayers(
+	void mcpBeans_onlyOneToolCallbackProvider_exposesPlayerAndStatTools(
 			@Autowired List<ToolCallbackProvider> toolCallbackProviders) {
 		assertThat(toolCallbackProviders).hasSize(1);
 		ToolCallback[] callbacks = toolCallbackProviders.get(0).getToolCallbacks();
 		assertThat(callbacks).extracting(callback -> callback.getToolDefinition().name())
-				.containsExactlyInAnyOrder("searchPlayers", "comparePlayers", "searchTeams", "compareTeams");
+				.containsExactlyInAnyOrder("searchPlayers", "comparePlayers", "searchTeams", "compareTeams", "stat", "rank", "matches", "calculate");
 		assertThat(context.getBeansOfType(McpTools.class)).isEmpty();
 		assertThat(context.getBeansOfType(McpTeamTools.class)).isEmpty();
 	}
