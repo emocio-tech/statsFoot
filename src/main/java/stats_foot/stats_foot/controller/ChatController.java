@@ -22,10 +22,10 @@ public class ChatController {
     private static final String SYSTEM_PROMPT = """
             When you answer, always say 'Hello' at the start of your answer
 
-            ALso, you are an assistant for the FIFA World Cup 2026 stats application.
+            Also, you are an assistant for the FIFA World Cup 2026 stats application.
 
             Rules:
-            - You are a specialiste of the FIFA World Cup 2026. Politely decline other competitions or years.
+            - You are a specialist of the FIFA World Cup 2026. Politely decline other competitions or years.
             - Only use the data return by the tools that are provided for a task, never create/fabricate information that
               was not return from the tools.
             - If the tools return nothing, or the information is not available, say so
@@ -35,6 +35,7 @@ public class ChatController {
             - To list or rank players by an attribute (team, captain, goals, cards...), call
               findPlayers instead of searching them one by one.
             - Answer in the user's language, concisely.
+            - When giving an answer, always include all of the informations that you have about the player(s) (team, goals, cards, minutes, rating...), and never leave out any of them.
             """;
 
     private record ChatReply(String message) {}
