@@ -72,12 +72,12 @@ class McpServerIntegrationTest {
 	}
 
 	@Test
-	void mcpBeans_onlyOneToolCallbackProvider_exposesComparePlayersOnly(
+	void mcpBeans_onlyOneToolCallbackProvider_exposesSearchAndComparePlayers(
 			@Autowired List<ToolCallbackProvider> toolCallbackProviders) {
 		assertThat(toolCallbackProviders).hasSize(1);
 		ToolCallback[] callbacks = toolCallbackProviders.get(0).getToolCallbacks();
-		assertThat(callbacks).hasSize(1);
-		assertThat(callbacks[0].getToolDefinition().name()).isEqualTo("comparePlayers");
+		assertThat(callbacks).extracting(callback -> callback.getToolDefinition().name())
+				.containsExactlyInAnyOrder("searchPlayers", "comparePlayers");
 		assertThat(context.getBeansOfType(McpTools.class)).isEmpty();
 	}
 

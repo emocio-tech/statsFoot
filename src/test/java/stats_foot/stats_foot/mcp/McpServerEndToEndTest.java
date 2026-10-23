@@ -39,6 +39,7 @@ import tools.jackson.databind.json.JsonMapper;
 class McpServerEndToEndTest {
 
 	private static final String TOOL_NAME = "comparePlayers";
+	private static final String SEARCH_TOOL_NAME = "searchPlayers";
 
 	@LocalServerPort
 	private int port;
@@ -93,12 +94,56 @@ class McpServerEndToEndTest {
 	}
 
 	@Test
-	void listTools_returnsExactlyComparePlayers() {
+	void listTools_returnsSearchPlayersAndComparePlayers() {
 		client.initialize();
 
 		List<McpSchema.Tool> tools = client.listTools().tools();
 
-		assertThat(tools).extracting(McpSchema.Tool::name).containsExactly(TOOL_NAME);
+		assertThat(tools).extracting(McpSchema.Tool::name).containsExactlyInAnyOrder(TOOL_NAME, SEARCH_TOOL_NAME);
+	}
+
+	@Test
+	@SuppressWarnings("unchecked")
+	void listTools_searchPlayers_hasOneRequiredStringName() {
+		client.initialize();
+
+		McpSchema.Tool tool = toolNamed(SEARCH_TOOL_NAME);
+		Map<String, Object> schema = tool.inputSchema();
+		Map<String, Object> properties = (Map<String, Object>) schema.get("properties");
+		List<String> required = (List<String>) schema.get("required");
+
+		assertThat(tool.description()).isNotBlank().matches("\\A\\p{ASCII}*\\z");
+		assertThat(properties).containsOnlyKeys("name");
+		assertThat((Map<String, Object>) properties.get("name")).containsEntry("type", "string");
+		assertThat(required).containsExactly("name");
+	}
+
+	@Test
+	void searchPlayers_knownName_returnsPlayerProfile() {
+		client.initialize();
+
+		McpSchema.CallToolResult result = client
+				.callTool(new McpSchema.CallToolRequest(SEARCH_TOOL_NAME, Map.of("name", "Raul RANGEL")));
+
+		assertThat(result.isError()).isNotEqualTo(Boolean.TRUE);
+		assertThat(textOf(result)).containsIgnoringCase("rangel");
+	}
+
+	@Test
+	void searchPlayers_unknownName_returnsToolError() {
+		client.initialize();
+
+		McpSchema.CallToolResult result = client
+				.callTool(new McpSchema.CallToolRequest(SEARCH_TOOL_NAME, Map.of("name", "qqqq nobody")));
+
+		assertThat(result.isError()).isTrue();
+	}
+
+	private McpSchema.Tool toolNamed(String name) {
+		return client.listTools().tools().stream()
+				.filter(tool -> name.equals(tool.name()))
+				.findFirst()
+				.orElseThrow();
 	}
 
 	@Test
@@ -107,7 +152,7 @@ class McpServerEndToEndTest {
 		Set<String> internalNames = Arrays.stream(PlayerTools.class.getDeclaredMethods())
 				.filter(method -> method.isAnnotationPresent(Tool.class))
 				.map(McpServerEndToEndTest::toolName)
-				.filter(name -> !TOOL_NAME.equals(name))
+				.filter(name -> !TOOL_NAME.equals(name) && !SEARCH_TOOL_NAME.equals(name))
 				.collect(Collectors.toSet());
 
 		List<String> exposed = client.listTools().tools().stream().map(McpSchema.Tool::name).toList();
@@ -121,7 +166,7 @@ class McpServerEndToEndTest {
 	void listTools_inputSchema_hasTwoRequiredStringInputs() {
 		client.initialize();
 
-		McpSchema.Tool tool = client.listTools().tools().get(0);
+		McpSchema.Tool tool = toolNamed(TOOL_NAME);
 		Map<String, Object> schema = tool.inputSchema();
 		Map<String, Object> properties = (Map<String, Object>) schema.get("properties");
 		List<String> required = (List<String>) schema.get("required");
@@ -137,7 +182,7 @@ class McpServerEndToEndTest {
 	void listTools_descriptions_areNonEmptyEnglish() {
 		client.initialize();
 
-		McpSchema.Tool tool = client.listTools().tools().get(0);
+		McpSchema.Tool tool = toolNamed(TOOL_NAME);
 		Map<String, Object> properties = (Map<String, Object>) tool.inputSchema().get("properties");
 
 		assertThat(tool.description()).isNotBlank().containsIgnoringCase("player").matches("\\A\\p{ASCII}*\\z");
