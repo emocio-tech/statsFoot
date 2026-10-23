@@ -103,12 +103,12 @@ class PlayerToolsTest {
 	@Test
 	void comparePlayers_playerNotFound_tellsToUseSearchPlayers() {
 		when(playerComparisonService.compareByName("mbappe", "unknown"))
-				.thenThrow(new ComparisonPlayerNotFoundException("Player B not found."));
+				.thenThrow(new ComparisonPlayerNotFoundException("Player \"unknown\" not found."));
 
 		ComparisonPlayerNotFoundException e = assertThrows(ComparisonPlayerNotFoundException.class,
 				() -> tools.comparePlayers("mbappe", "unknown"));
 
-		assertTrue(e.getMessage().startsWith("Player B not found."));
+		assertTrue(e.getMessage().startsWith("Player \"unknown\" not found."));
 		assertTrue(e.getMessage().contains("searchPlayers"));
 	}
 }
