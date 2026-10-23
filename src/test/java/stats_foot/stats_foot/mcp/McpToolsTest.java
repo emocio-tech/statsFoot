@@ -24,6 +24,7 @@ import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import stats_foot.stats_foot.player.dto.PlayerComparison;
+import stats_foot.stats_foot.player.dto.PlayerLookupResult;
 import stats_foot.stats_foot.player.exception.AmbiguousPlayerNameException;
 import stats_foot.stats_foot.player.exception.BlankComparisonNameException;
 import stats_foot.stats_foot.player.exception.ComparisonPlayerNotFoundException;
@@ -31,11 +32,13 @@ import stats_foot.stats_foot.player.exception.SamePlayerComparisonException;
 import stats_foot.stats_foot.player.repository.PlayerRepository;
 import stats_foot.stats_foot.player.service.PlayerComparisonService;
 import stats_foot.stats_foot.player.service.PlayerService;
+import stats_foot.stats_foot.player.tool.PlayerTools;
 
 class McpToolsTest {
 
 	private final PlayerComparisonService comparisonService = mock(PlayerComparisonService.class);
-	private final McpTools tools = new McpTools(comparisonService);
+	private final PlayerTools playerTools = mock(PlayerTools.class);
+	private final McpTools tools = new McpTools(comparisonService, playerTools);
 
 	private static List<Method> toolMethods() {
 		return Arrays.stream(McpTools.class.getDeclaredMethods())
@@ -66,14 +69,34 @@ class McpToolsTest {
 		assertEquals("stats_foot.stats_foot.mcp", McpTools.class.getPackageName());
 		assertFalse(McpTools.class.isAnnotationPresent(Component.class));
 		assertFalse(McpTools.class.isAnnotationPresent(Service.class));
-		assertEquals(1, toolMethods().size());
+		assertEquals(2, toolMethods().size());
 	}
 
 	@Test
-	void comparePlayers_toolAnnotation_hasNameAndDescriptions() {
-		List<Method> methods = toolMethods();
-		assertEquals(1, methods.size());
-		Method method = methods.get(0);
+	void searchPlayers_delegatesToPlayerTools() {
+		PlayerLookupResult lookup = mock(PlayerLookupResult.class);
+		when(playerTools.searchPlayers("mbappe")).thenReturn(lookup);
+
+		assertSame(lookup, tools.searchPlayers("mbappe"));
+		verify(playerTools).searchPlayers("mbappe");
+	}
+
+	@Test
+	void searchPlayers_toolAnnotation_hasNameAndDescriptions() throws NoSuchMethodException {
+		Method method = McpTools.class.getDeclaredMethod("searchPlayers", String.class);
+		Tool tool = method.getAnnotation(Tool.class);
+
+		assertEquals("searchPlayers", tool.name());
+		assertFalse(tool.description().isBlank());
+		ToolParam param = method.getParameters()[0].getAnnotation(ToolParam.class);
+		assertNotNull(param);
+		assertFalse(param.description().isBlank());
+		assertTrue(param.required());
+	}
+
+	@Test
+	void comparePlayers_toolAnnotation_hasNameAndDescriptions() throws NoSuchMethodException {
+		Method method = McpTools.class.getDeclaredMethod("comparePlayers", String.class, String.class);
 		Tool tool = method.getAnnotation(Tool.class);
 
 		assertEquals("comparePlayers", tool.name());
@@ -90,10 +113,10 @@ class McpToolsTest {
 	}
 
 	@Test
-	void mcpClasses_onlyDependOnComparisonService() {
+	void mcpClasses_onlyDependOnComparisonServiceAndPlayerTools() {
 		Constructor<?>[] constructors = McpTools.class.getDeclaredConstructors();
 		assertEquals(1, constructors.length);
-		assertEquals(List.of(PlayerComparisonService.class), Arrays.asList(constructors[0].getParameterTypes()));
+		assertEquals(List.of(PlayerComparisonService.class, PlayerTools.class), Arrays.asList(constructors[0].getParameterTypes()));
 
 		for (Field field : McpTools.class.getDeclaredFields()) {
 			if (Modifier.isStatic(field.getModifiers())) {
