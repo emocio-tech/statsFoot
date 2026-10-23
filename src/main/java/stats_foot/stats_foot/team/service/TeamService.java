@@ -6,8 +6,10 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import stats_foot.stats_foot.player.exception.InvalidSearchException;
 import stats_foot.stats_foot.player.util.NameNormalizer;
+import stats_foot.stats_foot.team.dto.TeamProfile;
 import stats_foot.stats_foot.team.dto.TeamSearchResult;
 import stats_foot.stats_foot.team.dto.TeamSummary;
+import stats_foot.stats_foot.team.exception.TeamNotFoundException;
 import stats_foot.stats_foot.team.model.TeamWithStats;
 import stats_foot.stats_foot.team.repository.TeamRepository;
 
@@ -16,6 +18,7 @@ import stats_foot.stats_foot.team.repository.TeamRepository;
 public class TeamService {
 
 	public static final String BLANK_QUERY_MESSAGE = "Please enter a team name.";
+	public static final String NOT_FOUND_MESSAGE = "Team not found.";
 
 	private final TeamRepository teamRepository;
 
@@ -42,6 +45,17 @@ public class TeamService {
 				.map(t -> new TeamSummary(t.team().id(), t.team().name(), t.team().code()))
 				.toList();
 		return new TeamSearchResult(teams, teams.size());
+	}
+
+	/**
+	 * Builds the profile of a team.
+	 *
+	 * @throws TeamNotFoundException if the id is unknown
+	 */
+	public TeamProfile getProfile(int id) {
+		TeamWithStats team = teamRepository.findById(id)
+				.orElseThrow(() -> new TeamNotFoundException(NOT_FOUND_MESSAGE));
+		return new TeamProfile(team.team().id(), team.team().name(), team.team().code(), team.stats());
 	}
 
 }

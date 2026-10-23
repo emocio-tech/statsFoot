@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import stats_foot.stats_foot.chat.TokenUsageLoggingAdvisor;
 import stats_foot.stats_foot.player.tool.PlayerTools;
+import stats_foot.stats_foot.team.tool.TeamTools;
 
 @RestController
 @RequestMapping("/api/chat")
@@ -34,15 +35,18 @@ public class ChatController {
               a list of names, ask the user which player they mean.
             - To list or rank players by an attribute (team, captain, goals, cards...), call
               findPlayers instead of searching them one by one.
+            - For information about one team, call searchTeams with its name or FIFA code. If it returns
+              a list of names, ask the user which team they mean.
+            - To compare two players, call comparePlayers; to compare two teams, call compareTeams.
             - Answer in the user's language, concisely.
-            - When giving an answer, always include all of the informations that you have about the player(s) (team, goals, cards, minutes, rating...), and never leave out any of them.
+            - When giving an answer, always include all of the informations that you have about the player(s) or team(s) (team, goals, cards, minutes, wins, points, rating...), and never leave out any of them.
             """;
 
     private record ChatReply(String message) {}
 
     private final ChatClient chatClient;
 
-    public ChatController(ChatClient.Builder chatClientBuilder, PlayerTools playerTools) {
+    public ChatController(ChatClient.Builder chatClientBuilder, PlayerTools playerTools, TeamTools teamTools) {
         ChatMemory chatMemory = MessageWindowChatMemory.builder().maxMessages(10).build();
         this.chatClient = chatClientBuilder
                 .defaultSystem(SYSTEM_PROMPT)
@@ -50,7 +54,7 @@ public class ChatController {
                         MessageChatMemoryAdvisor.builder(chatMemory).build(),
                         new SimpleLoggerAdvisor(),
                         new TokenUsageLoggingAdvisor(Ordered.LOWEST_PRECEDENCE))
-                .defaultTools(playerTools)
+                .defaultTools(playerTools, teamTools)
                 .build();
     }
 

@@ -99,7 +99,8 @@ class McpServerEndToEndTest {
 
 		List<McpSchema.Tool> tools = client.listTools().tools();
 
-		assertThat(tools).extracting(McpSchema.Tool::name).containsExactlyInAnyOrder(TOOL_NAME, SEARCH_TOOL_NAME);
+		assertThat(tools).extracting(McpSchema.Tool::name).containsExactlyInAnyOrder(TOOL_NAME, SEARCH_TOOL_NAME,
+				"searchTeams", "compareTeams");
 	}
 
 	@Test

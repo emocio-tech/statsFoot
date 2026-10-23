@@ -21,6 +21,7 @@ import stats_foot.stats_foot.team.model.TeamStats;
 import stats_foot.stats_foot.team.model.TeamWithStats;
 import stats_foot.stats_foot.team.repository.TeamRepository;
 import stats_foot.stats_foot.team.service.TeamComparisonService;
+import stats_foot.stats_foot.team.service.TeamService;
 
 class TeamComparisonServiceTest {
 
@@ -30,7 +31,7 @@ class TeamComparisonServiceTest {
 	@BeforeEach
 	void setUp() {
 		repository = mock(TeamRepository.class);
-		service = new TeamComparisonService(repository);
+		service = new TeamComparisonService(repository, new TeamService(repository));
 	}
 
 	/** Statistics with every value set to 1 (Integer) or 1.0 (Double). */

@@ -19,6 +19,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import stats_foot.stats_foot.player.tool.PlayerTools;
+import stats_foot.stats_foot.team.tool.TeamTools;
 
 class ChatControllerTest {
 
@@ -30,7 +31,7 @@ class ChatControllerTest {
         ChatClient.Builder builder = mock(ChatClient.Builder.class, RETURNS_SELF);
         chatClient = mock(ChatClient.class, RETURNS_DEEP_STUBS);
         when(builder.build()).thenReturn(chatClient);
-        mockMvc = MockMvcBuilders.standaloneSetup(new ChatController(builder, mock(PlayerTools.class))).build();
+        mockMvc = MockMvcBuilders.standaloneSetup(new ChatController(builder, mock(PlayerTools.class), mock(TeamTools.class))).build();
     }
 
     @Test

@@ -1,8 +1,14 @@
 package stats_foot.stats_foot.team.service;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
+import stats_foot.stats_foot.player.exception.InvalidSearchException;
+import stats_foot.stats_foot.player.util.NameNormalizer;
+import stats_foot.stats_foot.team.dto.TeamSearchResult;
+import stats_foot.stats_foot.team.dto.TeamSummary;
+import stats_foot.stats_foot.team.exception.AmbiguousTeamNameException;
 import stats_foot.stats_foot.player.dto.PlayerComparison.ComparisonLine;
 import stats_foot.stats_foot.player.dto.PlayerComparison.ComparisonSummary;
 import stats_foot.stats_foot.player.model.Team;
@@ -45,8 +51,52 @@ public class TeamComparisonService {
 
 	private final TeamRepository teamRepository;
 
-	public TeamComparisonService(TeamRepository teamRepository) {
+	private final TeamService teamService;
+
+	public TeamComparisonService(TeamRepository teamRepository, TeamService teamService) {
 		this.teamRepository = teamRepository;
+		this.teamService = teamService;
+	}
+
+	/**
+	 * Compares two teams designated by name or FIFA code. Each one is resolved with the team search (A first, then B).
+	 *
+	 * @throws InvalidSearchException       if a name is blank
+	 * @throws TeamNotFoundException        if a name matches no team
+	 * @throws AmbiguousTeamNameException   if a name matches several teams
+	 * @throws SameTeamComparisonException  if both names resolve to the same team
+	 */
+	public TeamComparison compareByName(String nameA, String nameB) {
+		int idA = resolve(nameA, "A");
+		int idB = resolve(nameB, "B");
+		return compare(idA, idB);
+	}
+
+	private int resolve(String name, String label) {
+		TeamSearchResult result;
+		try {
+			result = teamService.search(name);
+		} catch (InvalidSearchException e) {
+			throw new InvalidSearchException("Team " + label + " name must not be blank.");
+		}
+		List<TeamSummary> teams = result.teams();
+		if (teams.isEmpty()) {
+			throw new TeamNotFoundException("Team \"" + name + "\" not found.");
+		}
+		if (teams.size() == 1) {
+			return teams.get(0).id();
+		}
+		String wanted = NameNormalizer.normalize(name);
+		List<TeamSummary> exact = teams.stream()
+				.filter(t -> NameNormalizer.normalize(t.name()).equals(wanted))
+				.toList();
+		if (exact.size() == 1) {
+			return exact.get(0).id();
+		}
+		String candidates = teams.stream().map(t -> t.name() + " (" + t.code() + ")")
+				.collect(Collectors.joining(", "));
+		throw new AmbiguousTeamNameException("Several teams match the name \"" + name + "\": " + candidates
+				+ ". Please be more precise.");
 	}
 
 	/**
