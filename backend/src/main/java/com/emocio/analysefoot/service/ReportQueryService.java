@@ -41,7 +41,8 @@ public class ReportQueryService {
                             SELECT matches_played, matches_started, minutes_played, goals, penalty_goals, own_goals,
                                    decisive_goals, assists, yellow_cards, second_yellows, direct_reds, red_cards,
                                    fair_play_points, fouls_committed, free_kicks_won, free_kicks_conceded, duels_won,
-                                   duels_lost, corners, offsides, distance_km, man_of_the_match_count, rating, rating_weighted
+                                   duels_lost, corners, offsides, distance_km, man_of_the_match_count, rating, rating_weighted,
+                                   captain_matches, goalkeeper_matches
                             FROM v_player_tournament_stats WHERE player_id = :id AND competition_id = %s
                             """.formatted(LAST_COMPETITION))
                     .param("id", playerId).query(PlayerReport.Totals.class).single();

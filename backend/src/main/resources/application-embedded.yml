@@ -1,0 +1,5 @@
+# Profil « embedded » : PostgreSQL embarqué, vide à chaque démarrage. Les matchs sont importés de worldcup-full.json
+# (cherché dans le répertoire courant puis son parent), puis DonneesStatsRunner ajoute notes et statistiques.
+analyse-foot:
+  import:
+    worldcup-file: worldcup-full.json

@@ -30,7 +30,7 @@ class ReportControllerTest {
     @Test
     void playerReport() throws Exception {
         PlayerReport.Totals totals = new PlayerReport.Totals(8, 8, 698, 10, 1, 0, 3, 6, 1, 0, 0, 0, -1,
-                9, 18, 9, 80, 70, 7, 6, new BigDecimal("80.40"), 5, new BigDecimal("8.1"), new BigDecimal("8.1"));
+                9, 18, 9, 80, 70, 7, 6, new BigDecimal("80.40"), 5, new BigDecimal("8.1"), new BigDecimal("8.1"), 0, 0);
         when(reportQueryService.playerReport(664)).thenReturn(Optional.of(new PlayerReport(664, "Kylian MBAPPE", 33,
                 "France", false, totals, List.of(), null,
                 List.of(new PlayerReport.RankLine("TOP_SCORER", "Meilleur buteur", 1, 140)),

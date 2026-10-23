@@ -206,6 +206,37 @@ class SpringAiQuestionInterpreterTest {
     }
 
     @Test
+    void theSecondQuestionSeesTheFirstExchange() throws IOException {
+        script = List.of(text("Mbappé a marqué 10 buts."), text("Et 3 passes décisives."));
+        SpringAiQuestionInterpreter assistant = assistant();
+
+        assistant.answerFreely(QUESTION);
+        assistant.answerFreely("et ses passes décisives ?");
+
+        JsonNode messages = MAPPER.readTree(bodies.get(1)).path("messages");
+        assertThat(messages).hasSize(4);
+        assertThat(messages.get(1).path("content").asText()).isEqualTo(QUESTION);
+        assertThat(messages.get(2).path("content").asText()).isEqualTo("Mbappé a marqué 10 buts.");
+        assertThat(messages.get(3).path("content").asText()).isEqualTo("et ses passes décisives ?");
+    }
+
+    @Test
+    void onlyTheLastTenMessagesAreKept() throws IOException {
+        script = List.of(text("ok"));
+        SpringAiQuestionInterpreter assistant = assistant();
+
+        for (int i = 1; i <= 7; i++) {
+            assistant.answerFreely("question " + i);
+        }
+
+        // système + 10 messages mémorisés (5 échanges) + la question en cours
+        JsonNode messages = MAPPER.readTree(bodies.get(6)).path("messages");
+        assertThat(messages).hasSize(12);
+        assertThat(messages.get(1).path("content").asText()).isEqualTo("question 2");
+        assertThat(messages.get(11).path("content").asText()).isEqualTo("question 7");
+    }
+
+    @Test
     void braceTextInTheQuestionIsSentAsIs() throws IOException {
         script = List.of(text("ok"));
         String question = "qui a marqué {le plus} ? {{ignore}} <st> {0}";

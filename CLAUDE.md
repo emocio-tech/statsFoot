@@ -44,10 +44,10 @@ Le frontend de la branche n'a pas de runner de tests : les fichiers `*.spec.ts` 
 
 ## Architecture
 
-- **BackEnd** : Java avec la surcouche Spring Boot 3.5 (Spring AI 1.1), deux racines de packages : `com.emocio.analysefoot` (onglet Analyse, rapports, notes, import) et `stats_foot.stats_foot` (recherche et comparaison de joueurs et d'équipes, chat LLM).
+- **BackEnd** : Java avec la surcouche Spring Boot 3.5 (Spring AI 1.1), une seule racine de packages, `com.emocio.analysefoot` (onglet Analyse, rapports, notes, import ; sous-packages `player` et `team` pour la recherche et la comparaison, utilisées comme tools du LLM). Un seul contrôleur LLM : `AnalyseController`.
 - **FrontEnd** : Angular.
 - **Données** : base **PostgreSQL** gérée par Flyway, alimentée par l'import de `worldcup-full.json` puis `donneesStats.sql` (notes et stats fictives). `data/donneesStats.json` est un instantané de référence, utilisé uniquement par les tests.
-- **MCP** : un seul serveur (transport **STREAMABLE**, `/mcp`) expose les outils de la branche (`metrics`, `rank`, `find`, `player_report`, `team_report`, …) et ceux de `main` (`searchPlayers`, `comparePlayers`).
+- **MCP** : un seul serveur (transport **STREAMABLE**, `/mcp`) expose les outils de la branche (`metrics`, `rank`, `find`, `player_report`, `team_report`, …) et ceux de `main` (`searchPlayers`, `comparePlayers`). `findPlayers` et `compareTeams` sont réservés au LLM interne.
 
 ## Conventions
 

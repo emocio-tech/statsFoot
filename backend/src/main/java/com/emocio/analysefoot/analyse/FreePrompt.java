@@ -16,6 +16,7 @@ final class FreePrompt {
                 - stat lit une statistique : liste classée, somme, moyenne, maximum, minimum, effectif, avec filtre par \
                 nom ou par équipe ;
                 - find, player_report et team_report donnent l'identité et le rapport complet d'un joueur ou d'une équipe ;
+                - searchPlayers donne le profil d'un joueur (ou les noms proches), findPlayers filtre et classe les joueurs                 (équipe, capitaines, une statistique), comparePlayers et compareTeams comparent deux joueurs ou deux équipes                 statistique par statistique, avec le meilleur de chaque ligne et un verdict ;
                 - matches donne les matchs (scores, phase, stade, date) d'une équipe ou d'une phase ;
                 - calculate fait l'arithmétique exactement.
                 Réponds ensuite en une ou deux phrases courtes, en français, en texte brut sans Markdown ni liste. Si la \

@@ -3,8 +3,9 @@ spring:
     name: analyse-foot
   config:
     # Fichier .env facultatif à la racine du projet (ignoré par git) : LLM_KEY=...
+    # Cherché dans le répertoire courant, puis dans son parent (lancement depuis le module backend).
     # Une variable d'environnement du même nom reste prioritaire.
-    import: optional:file:.env[.properties]
+    import: optional:file:.env[.properties],optional:file:../.env[.properties]
   ai:
     mcp:
       # Serveur MCP « statsfoot » en lecture seule : transport STREAMABLE sur /mcp
@@ -58,12 +59,6 @@ analyse:
 # Trace des échanges (appli, LLM, tool rank, MCP, SQL) : journalisée (logger analyse.trace) et renvoyée à l'interface.
 # Elle contient la question saisie : mettre ANALYSE_TRACE=false pour ne plus la journaliser.
 analyse.trace.enabled: ${ANALYSE_TRACE:true}
-
-# Trace des appels au LLM et aux tools (SimpleLoggerAdvisor du chat, outils de joueurs)
-logging:
-  level:
-    org.springframework.ai.chat.client.advisor: DEBUG
-    org.springframework.ai.model.tool: DEBUG
 
 management:
   endpoints:

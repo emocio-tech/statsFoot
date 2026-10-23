@@ -3,6 +3,8 @@ package com.emocio.analysefoot.analyse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
@@ -34,10 +36,13 @@ public class SpringAiQuestionInterpreter implements QuestionInterpreter {
     /** Allers et retours LLM, tool au plus par saisie : garde-fou contre une boucle, pas un plafond d'usage. */
     static final int MAX_STEPS = 6;
     private static final int MAX_RESULT_SHOWN = 400;
+    private static final String CONVERSATION_ID = "default";
 
     private final ChatClient chatClient;
     private final Function<List<ToolCallback>, ChatOptions> options;
     private final Supplier<List<ToolCallback>> dataTools;
+    /** Derniers échanges (question et réponse, sans les tools), partagés par tous les visiteurs comme le chat de main. */
+    private final ChatMemory memory = MessageWindowChatMemory.builder().maxMessages(10).build();
 
     /**
      * @param options   options de l'appel pour les tools donnés (choix libre du modèle, jamais exécutés par Spring AI)
@@ -61,8 +66,10 @@ public class SpringAiQuestionInterpreter implements QuestionInterpreter {
             Map<String, ToolCallback> tools = new LinkedHashMap<>();
             dataTools.get().forEach(t -> tools.put(t.getToolDefinition().name(), t));
             ChatOptions callOptions = options.apply(List.copyOf(tools.values()));
-            List<Message> messages = new ArrayList<>(List.of(new SystemMessage(FreePrompt.system()),
-                    new UserMessage(question)));
+            List<Message> messages = new ArrayList<>();
+            messages.add(new SystemMessage(FreePrompt.system()));
+            messages.addAll(memory.get(CONVERSATION_ID));
+            messages.add(new UserMessage(question));
             for (int step = 1; step <= MAX_STEPS; step++) {
                 Trace.out("LLM", "Appel du modèle (étape " + step + ")", step == 1
                         ? "question : « " + question + " » ; tools de lecture : " + String.join(", ", tools.keySet())
@@ -81,6 +88,7 @@ public class SpringAiQuestionInterpreter implements QuestionInterpreter {
                 }
                 if (!message.hasToolCalls()) {
                     Trace.in("LLM", "Réponse finale", message.getText());
+                    memory.add(CONVERSATION_ID, List.of(new UserMessage(question), new AssistantMessage(message.getText())));
                     return message.getText();
                 }
                 Trace.in("LLM", "Le modèle demande " + message.getToolCalls().size() + " appel(s) de tool",

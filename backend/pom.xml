@@ -93,6 +93,26 @@
     <build>
         <finalName>analyse-foot</finalName>
         <plugins>
+            <!-- Sélectionne le JDK de ~/.m2/toolchains.xml qui correspond à java.version (25 par défaut, hérité du parent) -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-toolchains-plugin</artifactId>
+                <version>3.2.0</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>toolchain</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <toolchains>
+                        <jdk>
+                            <version>${java.version}</version>
+                        </jdk>
+                    </toolchains>
+                </configuration>
+            </plugin>
             <!-- Copie le build Angular dans static/ pour servir le front depuis Spring -->
             <plugin>
                 <artifactId>maven-resources-plugin</artifactId>

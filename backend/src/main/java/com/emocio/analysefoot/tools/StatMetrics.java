@@ -19,6 +19,9 @@ public final class StatMetrics {
     private static final Map<String, String> TEAM = new LinkedHashMap<>();
 
     /** Expression SQL des statistiques d'équipe qui ne sont pas une colonne. */
+    /** Expression SQL des statistiques de joueur qui ne sont pas une colonne. */
+    private static final Map<String, String> PLAYER_EXPRESSION = Map.of("total_cards", "yellow_cards + red_cards");
+
     private static final Map<String, String> TEAM_EXPRESSION = Map.of("goal_difference", "goals_for - goals_against");
 
     /** Statistiques détaillées inventées (partie 6 de donneesStats.sql) et passes décisives : données FICTIVES. */
@@ -49,6 +52,9 @@ public final class StatMetrics {
         PLAYER.put("offsides", "hors-jeu");
         PLAYER.put("distance_km", "km parcourus");
         PLAYER.put("man_of_the_match_count", "titres d'homme du match");
+        PLAYER.put("total_cards", "total de cartons (jaunes et rouges)");
+        PLAYER.put("captain_matches", "matchs comme capitaine");
+        PLAYER.put("goalkeeper_matches", "matchs comme gardien");
         PLAYER.put("rating", "note moyenne");
         PLAYER.put("rating_weighted", "note pondérée par le temps de jeu");
 
@@ -99,7 +105,7 @@ public final class StatMetrics {
         if (metric == null || !(players ? PLAYER : TEAM).containsKey(metric)) {
             return null;
         }
-        return players ? metric : TEAM_EXPRESSION.getOrDefault(metric, metric);
+        return (players ? PLAYER_EXPRESSION : TEAM_EXPRESSION).getOrDefault(metric, metric);
     }
 
     /** Libellé français (unité) de la statistique ; son nom si elle est inconnue. */

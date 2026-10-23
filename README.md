@@ -103,7 +103,10 @@ La recherche de l'onglet Analyse se passe ainsi :
 2. **toute autre saisie est confiée en priorité au LLM**, via le `ChatClient` de Spring AI (format OpenAI Chat
    Completions). Il l'interprète librement et y répond en enchaînant les tools de lecture, que l'application exécute
    (lecture seule, SQL) : `metrics`, `rank`, `stat`, `find`, `player_report`, `team_report`, `matches`, `calculate`
-   (voir plus bas). Sa réponse courte s'affiche en gras (statut `FREE_TEXT`) ;
+   (voir plus bas), et la recherche et la comparaison issues de `main` : `searchPlayers` (profil d'un joueur),
+   `findPlayers` (filtre et classement de joueurs), `comparePlayers` et `compareTeams`. Tous lisent le même catalogue
+   de statistiques (buts, passes décisives, cartons, fair-play, note, capitaine, gardien…). Il garde les 10 derniers
+   messages de la conversation (une seule, partagée) ; sa réponse courte s'affiche en gras (statut `FREE_TEXT`) ;
 3. sans clé LLM, ou si le modèle n'aboutit pas, les 8 questions suggérées sont proposées (clic). Elles ne servent plus à
    interpréter une saisie : il n'y a plus de reconnaissance par mots-clés.
 
@@ -170,7 +173,9 @@ Fonctions reprises de la branche `main`, désormais branchées sur la base Postg
 
 - recherche d'un joueur par son nom (profil et statistiques du tournoi) ;
 - comparaison de deux joueurs et de deux équipes (leader sur chaque statistique, verdict rédigé) ;
-- chat LLM (`/api/chat`) et outils MCP `searchPlayers` / `comparePlayers`, exposés avec le protocole **STREAMABLE**.
+- ces fonctions sont des **tools du LLM de l'onglet Analyse** (`GET /api/analyse?q=`, seul point d'entrée LLM) : il n'y a
+  plus de routes `/api/chat`, `/api/players` ni `/api/teams` ;
+- le serveur MCP expose toujours `searchPlayers` et `comparePlayers`, avec le protocole **STREAMABLE**.
 
 L'ancienne base H2 et l'import de `data/donneesStats.json` ne sont plus utilisés : PostgreSQL est la seule source de données.
 

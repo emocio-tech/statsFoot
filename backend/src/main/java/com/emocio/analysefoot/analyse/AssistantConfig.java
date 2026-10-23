@@ -6,6 +6,9 @@ import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
+import org.springframework.ai.tool.method.MethodToolCallbackProvider;
+import com.emocio.analysefoot.player.tool.PlayerTools;
+import com.emocio.analysefoot.team.tool.TeamTools;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -72,12 +75,20 @@ public class AssistantConfig {
                 beanFactory == null ? List::of : () -> dataTools(beanFactory));
     }
 
-    /** Tools de lecture de l'assistant : ceux du serveur MCP (metrics, rank, find, rapports) et stat, matches, calculate. */
+    /**
+     * Tools de lecture de l'assistant : ceux du serveur MCP (metrics, rank, find, rapports), stat, matches, calculate,
+     * et la recherche, le filtrage et la comparaison de joueurs et d'équipes (searchPlayers, findPlayers,
+     * comparePlayers, compareTeams).
+     */
     static List<ToolCallback> dataTools(BeanFactory beanFactory) {
         List<ToolCallback> tools = new ArrayList<>();
         for (String provider : List.of("statsFootTools", "statToolsProvider")) {
             tools.addAll(List.of(beanFactory.getBean(provider, ToolCallbackProvider.class).getToolCallbacks()));
         }
+        // outils joueur et équipe : jamais déclarés comme ToolCallbackProvider, pour que le serveur MCP ne les expose pas
+        tools.addAll(List.of(MethodToolCallbackProvider.builder()
+                .toolObjects(beanFactory.getBean(PlayerTools.class), beanFactory.getBean(TeamTools.class))
+                .build().getToolCallbacks()));
         return tools;
     }
 

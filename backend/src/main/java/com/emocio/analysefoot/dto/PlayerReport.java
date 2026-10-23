@@ -49,7 +49,9 @@ public record PlayerReport(
             BigDecimal distanceKm,
             Integer manOfTheMatchCount,
             BigDecimal rating,
-            BigDecimal ratingWeighted) {
+            BigDecimal ratingWeighted,
+            Integer captainMatches,
+            Integer goalkeeperMatches) {
     }
 
     /** Un match du joueur ; {@code score} est donné du point de vue de son équipe. */
