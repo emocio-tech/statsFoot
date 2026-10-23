@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import stats_foot.stats_foot.chat.TokenUsageLoggingAdvisor;
 import stats_foot.stats_foot.player.tool.PlayerTools;
+import stats_foot.stats_foot.tool.StatTools;
 
 @RestController
 @RequestMapping("/api/chat")
@@ -34,6 +35,9 @@ public class ChatController {
               a list of names, ask the user which player they mean.
             - To list or rank players by an attribute (team, captain, goals, cards...), call
               findPlayers instead of searching them one by one.
+            - To rank players or teams by a statistic (ties kept), call rank. To read, sum or average a
+              statistic, call stat. For scores, winners, stadiums or schedule, call matches.
+            - Never compute by yourself: for any sum, difference, average, ratio or percentage, call calculate.
             - Answer in the user's language, concisely.
             """;
 
@@ -41,7 +45,7 @@ public class ChatController {
 
     private final ChatClient chatClient;
 
-    public ChatController(ChatClient.Builder chatClientBuilder, PlayerTools playerTools) {
+    public ChatController(ChatClient.Builder chatClientBuilder, PlayerTools playerTools, StatTools statTools) {
         ChatMemory chatMemory = MessageWindowChatMemory.builder().maxMessages(10).build();
         this.chatClient = chatClientBuilder
                 .defaultSystem(SYSTEM_PROMPT)
@@ -49,7 +53,7 @@ public class ChatController {
                         MessageChatMemoryAdvisor.builder(chatMemory).build(),
                         new SimpleLoggerAdvisor(),
                         new TokenUsageLoggingAdvisor(Ordered.LOWEST_PRECEDENCE))
-                .defaultTools(playerTools)
+                .defaultTools(playerTools, statTools)
                 .build();
     }
 

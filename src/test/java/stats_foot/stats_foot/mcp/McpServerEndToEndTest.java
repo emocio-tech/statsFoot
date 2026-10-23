@@ -94,12 +94,13 @@ class McpServerEndToEndTest {
 	}
 
 	@Test
-	void listTools_returnsSearchPlayersAndComparePlayers() {
+	void listTools_returnsPlayerAndStatTools() {
 		client.initialize();
 
 		List<McpSchema.Tool> tools = client.listTools().tools();
 
-		assertThat(tools).extracting(McpSchema.Tool::name).containsExactlyInAnyOrder(TOOL_NAME, SEARCH_TOOL_NAME);
+		assertThat(tools).extracting(McpSchema.Tool::name).containsExactlyInAnyOrder(TOOL_NAME, SEARCH_TOOL_NAME, "stat",
+				"rank", "matches", "calculate");
 	}
 
 	@Test

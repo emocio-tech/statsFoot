@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import stats_foot.stats_foot.player.service.PlayerComparisonService;
 import stats_foot.stats_foot.player.tool.PlayerTools;
+import stats_foot.stats_foot.tool.StatTools;
 
 /** Registers the tools exposed by the MCP server; McpTools is deliberately not a bean. */
 @Configuration
@@ -13,9 +14,9 @@ public class McpServerConfig {
 
 	@Bean
 	public ToolCallbackProvider mcpToolCallbackProvider(PlayerComparisonService playerComparisonService,
-			PlayerTools playerTools) {
+			PlayerTools playerTools, StatTools statTools) {
 		return MethodToolCallbackProvider.builder()
-				.toolObjects(new McpTools(playerComparisonService, playerTools))
+				.toolObjects(new McpTools(playerComparisonService, playerTools), statTools)
 				.build();
 	}
 
