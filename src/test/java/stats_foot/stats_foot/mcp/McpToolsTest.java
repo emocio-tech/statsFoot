@@ -32,13 +32,13 @@ import stats_foot.stats_foot.player.repository.PlayerRepository;
 import stats_foot.stats_foot.player.service.PlayerComparisonService;
 import stats_foot.stats_foot.player.service.PlayerService;
 
-class McpPlayerToolsTest {
+class McpToolsTest {
 
 	private final PlayerComparisonService comparisonService = mock(PlayerComparisonService.class);
-	private final McpPlayerTools tools = new McpPlayerTools(comparisonService);
+	private final McpTools tools = new McpTools(comparisonService);
 
 	private static List<Method> toolMethods() {
-		return Arrays.stream(McpPlayerTools.class.getDeclaredMethods())
+		return Arrays.stream(McpTools.class.getDeclaredMethods())
 				.filter(m -> m.isAnnotationPresent(Tool.class))
 				.toList();
 	}
@@ -63,9 +63,9 @@ class McpPlayerToolsTest {
 
 	@Test
 	void class_isInMcpPackageAndNotAComponent() {
-		assertEquals("stats_foot.stats_foot.mcp", McpPlayerTools.class.getPackageName());
-		assertFalse(McpPlayerTools.class.isAnnotationPresent(Component.class));
-		assertFalse(McpPlayerTools.class.isAnnotationPresent(Service.class));
+		assertEquals("stats_foot.stats_foot.mcp", McpTools.class.getPackageName());
+		assertFalse(McpTools.class.isAnnotationPresent(Component.class));
+		assertFalse(McpTools.class.isAnnotationPresent(Service.class));
 		assertEquals(1, toolMethods().size());
 	}
 
@@ -91,11 +91,11 @@ class McpPlayerToolsTest {
 
 	@Test
 	void mcpClasses_onlyDependOnComparisonService() {
-		Constructor<?>[] constructors = McpPlayerTools.class.getDeclaredConstructors();
+		Constructor<?>[] constructors = McpTools.class.getDeclaredConstructors();
 		assertEquals(1, constructors.length);
 		assertEquals(List.of(PlayerComparisonService.class), Arrays.asList(constructors[0].getParameterTypes()));
 
-		for (Field field : McpPlayerTools.class.getDeclaredFields()) {
+		for (Field field : McpTools.class.getDeclaredFields()) {
 			if (Modifier.isStatic(field.getModifiers())) {
 				continue;
 			}

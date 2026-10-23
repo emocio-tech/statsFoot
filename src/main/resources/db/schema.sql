@@ -2,7 +2,8 @@
 -- schema.sql : H2 2.x schema of the player data (port of data/donneesStats.sql)
 -- =============================================================================
 -- Ports parts 1, 2 and 4 of data/donneesStats.sql (PostgreSQL) and the view
--- v_player_tournament_stats of part 5. Part 3 (rating computation) is not ported:
+-- v_player_tournament_stats of part 5 (plus v_team_tournament_stats, which has no PostgreSQL
+-- counterpart). Part 3 (rating computation) is not ported:
 -- the ratings come from data/donneesStats.json.
 --
 -- The script is idempotent (IF NOT EXISTS / CREATE OR REPLACE VIEW) and can run at
@@ -290,3 +291,47 @@ LEFT JOIN (
     GROUP BY b.match_id, b.player_id
 ) bk ON bk.match_id = r.match_id AND bk.player_id = r.player_id
 GROUP BY m.competition_id, r.player_id, pl.name, r.team_id, t.name;
+
+
+-- Team tournament view -------------------------------------------------------
+-- One row per team and per competition: filter on competition_id.
+-- Same card rules as v_player_tournament_stats; the cards are counted per team in the
+-- booking table. Totals of team_match_stats stay NULL when no match has the data.
+-- detailed_stats_matches = number of matches covered by team_match_stats.
+
+CREATE OR REPLACE VIEW v_team_tournament_stats AS
+SELECT m.competition_id,
+       r.team_id,
+       t.name                                             AS team,
+       COUNT(*)                                           AS matches_played,
+       COUNT(*) FILTER (WHERE r.result = 'W')             AS wins,
+       COUNT(*) FILTER (WHERE r.result = 'D')             AS draws,
+       COUNT(*) FILTER (WHERE r.result = 'L')             AS losses,
+       SUM(r.points)                                      AS points,
+       SUM(r.goals_for)                                   AS goals_for,
+       SUM(r.goals_against)                               AS goals_against,
+       SUM(COALESCE(bk.yellow, 0))                        AS yellow_cards,
+       SUM(COALESCE(bk.red, 0))                           AS red_cards,
+       SUM(r.fair_play_points)                            AS fair_play_points,
+       SUM(s.fouls_committed)                             AS fouls_committed,
+       SUM(s.free_kicks_won)                              AS free_kicks_won,
+       SUM(s.free_kicks_conceded)                         AS free_kicks_conceded,
+       SUM(s.duels_won)                                   AS duels_won,
+       SUM(s.duels_lost)                                  AS duels_lost,
+       SUM(s.corners)                                     AS corners,
+       SUM(s.offsides)                                    AS offsides,
+       SUM(s.distance_km)                                 AS distance_km,
+       COUNT(s.match_id)                                  AS detailed_stats_matches,
+       ROUND(AVG(r.rating), 1)                            AS rating
+FROM team_match_rating r
+JOIN match m ON m.id = r.match_id
+JOIN team t  ON t.id = r.team_id
+LEFT JOIN team_match_stats s ON s.match_id = r.match_id AND s.team_id = r.team_id
+LEFT JOIN (
+    SELECT b.match_id, b.team_id,
+           COUNT(*) FILTER (WHERE b.card = 'Y')           AS yellow,
+           COUNT(*) FILTER (WHERE b.card IN ('R', 'Y/R')) AS red
+    FROM booking b
+    GROUP BY b.match_id, b.team_id
+) bk ON bk.match_id = r.match_id AND bk.team_id = r.team_id
+GROUP BY m.competition_id, r.team_id, t.name;

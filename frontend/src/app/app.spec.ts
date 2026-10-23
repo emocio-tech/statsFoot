@@ -18,11 +18,11 @@ describe('App', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
-  it('nav shows Search and Compare links with the right hrefs', () => {
+  it('nav shows the four links with the right hrefs', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     const links: HTMLAnchorElement[] = Array.from(fixture.nativeElement.querySelectorAll('nav a'));
-    expect(links.map((a) => a.textContent?.trim())).toEqual(['Search', 'Compare']);
-    expect(links.map((a) => a.getAttribute('href'))).toEqual(['/', '/compare']);
+    expect(links.map((a) => a.textContent?.trim())).toEqual(['Players', 'Chat', 'Compare players', 'Compare teams']);
+    expect(links.map((a) => a.getAttribute('href'))).toEqual(['/', '/chat', '/compare', '/compare-teams']);
   });
 });

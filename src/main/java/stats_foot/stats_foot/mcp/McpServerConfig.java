@@ -6,7 +6,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import stats_foot.stats_foot.player.service.PlayerComparisonService;
 
-/** Registers the tools exposed by the MCP server; McpPlayerTools is deliberately not a bean. */
+/** Registers the tools exposed by the MCP server; McpTools is deliberately not a bean. */
 @Configuration
 public class McpServerConfig {
 

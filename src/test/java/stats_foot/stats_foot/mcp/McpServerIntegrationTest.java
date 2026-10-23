@@ -78,7 +78,7 @@ class McpServerIntegrationTest {
 		ToolCallback[] callbacks = toolCallbackProviders.get(0).getToolCallbacks();
 		assertThat(callbacks).hasSize(1);
 		assertThat(callbacks[0].getToolDefinition().name()).isEqualTo("comparePlayers");
-		assertThat(context.getBeansOfType(McpPlayerTools.class)).isEmpty();
+		assertThat(context.getBeansOfType(McpTools.class)).isEmpty();
 	}
 
 	private static String toolName(Method method) {
