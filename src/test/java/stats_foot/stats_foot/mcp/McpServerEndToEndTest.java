@@ -101,6 +101,9 @@ class McpServerEndToEndTest {
 
 		assertThat(tools).extracting(McpSchema.Tool::name).containsExactlyInAnyOrder(TOOL_NAME, SEARCH_TOOL_NAME, "stat",
 				"rank", "matches", "calculate");
+
+		assertThat(tools).extracting(McpSchema.Tool::name).containsExactlyInAnyOrder(TOOL_NAME, SEARCH_TOOL_NAME,
+				"searchTeams", "compareTeams");
 	}
 
 	@Test

@@ -34,6 +34,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import stats_foot.stats_foot.player.tool.PlayerTools;
 import stats_foot.stats_foot.tool.StatTools;
+import stats_foot.stats_foot.team.tool.TeamTools;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -80,8 +81,9 @@ class McpServerIntegrationTest {
 		assertThat(toolCallbackProviders).hasSize(1);
 		ToolCallback[] callbacks = toolCallbackProviders.get(0).getToolCallbacks();
 		assertThat(callbacks).extracting(callback -> callback.getToolDefinition().name())
-				.containsExactlyInAnyOrder("searchPlayers", "comparePlayers", "stat", "rank", "matches", "calculate");
+				.containsExactlyInAnyOrder("searchPlayers", "comparePlayers", "searchTeams", "compareTeams", "stat", "rank", "matches", "calculate");
 		assertThat(context.getBeansOfType(McpTools.class)).isEmpty();
+		assertThat(context.getBeansOfType(McpTeamTools.class)).isEmpty();
 	}
 
 	private static String toolName(Method method) {

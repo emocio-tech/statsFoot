@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import stats_foot.stats_foot.chat.TokenUsageLoggingAdvisor;
 import stats_foot.stats_foot.player.tool.PlayerTools;
 import stats_foot.stats_foot.tool.StatTools;
+import stats_foot.stats_foot.team.tool.TeamTools;
 
 @RestController
 @RequestMapping("/api/chat")
@@ -23,10 +24,10 @@ public class ChatController {
     private static final String SYSTEM_PROMPT = """
             When you answer, always say 'Hello' at the start of your answer
 
-            ALso, you are an assistant for the FIFA World Cup 2026 stats application.
+            Also, you are an assistant for the FIFA World Cup 2026 stats application.
 
             Rules:
-            - You are a specialiste of the FIFA World Cup 2026. Politely decline other competitions or years.
+            - You are a specialist of the FIFA World Cup 2026. Politely decline other competitions or years.
             - Only use the data return by the tools that are provided for a task, never create/fabricate information that
               was not return from the tools.
             - If the tools return nothing, or the information is not available, say so
@@ -35,17 +36,21 @@ public class ChatController {
               a list of names, ask the user which player they mean.
             - To list or rank players by an attribute (team, captain, goals, cards...), call
               findPlayers instead of searching them one by one.
+            - For information about one team, call searchTeams with its name or FIFA code. If it returns
+              a list of names, ask the user which team they mean.
+            - To compare two players, call comparePlayers; to compare two teams, call compareTeams.
             - To rank players or teams by a statistic (ties kept), call rank. To read, sum or average a
               statistic, call stat. For scores, winners, stadiums or schedule, call matches.
             - Never compute by yourself: for any sum, difference, average, ratio or percentage, call calculate.
             - Answer in the user's language, concisely.
+            - When giving an answer, always include all of the informations that you have about the player(s) or team(s) (team, goals, cards, minutes, wins, points, rating...), and never leave out any of them.
             """;
 
     private record ChatReply(String message) {}
 
     private final ChatClient chatClient;
 
-    public ChatController(ChatClient.Builder chatClientBuilder, PlayerTools playerTools, StatTools statTools) {
+    public ChatController(ChatClient.Builder chatClientBuilder, PlayerTools playerTools, TeamTools teamTools, StatTools statTools) {
         ChatMemory chatMemory = MessageWindowChatMemory.builder().maxMessages(10).build();
         this.chatClient = chatClientBuilder
                 .defaultSystem(SYSTEM_PROMPT)
@@ -53,7 +58,7 @@ public class ChatController {
                         MessageChatMemoryAdvisor.builder(chatMemory).build(),
                         new SimpleLoggerAdvisor(),
                         new TokenUsageLoggingAdvisor(Ordered.LOWEST_PRECEDENCE))
-                .defaultTools(playerTools, statTools)
+                .defaultTools(playerTools, teamTools, statTools)
                 .build();
     }
 
