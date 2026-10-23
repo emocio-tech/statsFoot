@@ -1,0 +1,22 @@
+<article class="card">
+  <h2 data-testid="name">{{ profile().name }}</h2>
+
+  <section>
+    <h3>Identity</h3>
+    <dl>
+      <dt>Team</dt><dd data-testid="team">{{ profile().teamName }} ({{ profile().teamCode }})</dd>
+      <dt>Goalkeeper matches</dt><dd data-testid="goalkeeperMatches">{{ profile().goalkeeperMatches }}</dd>
+      <dt>Captain matches</dt><dd data-testid="captainMatches">{{ profile().captainMatches }}</dd>
+    </dl>
+  </section>
+
+  <section>
+    <h3>Statistics</h3>
+    <dl>
+      @for (line of statLines; track line.key) {
+        <dt [attr.data-testid]="'stat-label-' + line.key">{{ line.label }}</dt>
+        <dd [attr.data-testid]="'stat-' + line.key">{{ display(profile().stats[line.key]) }}</dd>
+      }
+    </dl>
+  </section>
+</article>

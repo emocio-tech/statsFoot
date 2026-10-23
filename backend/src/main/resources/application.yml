@@ -7,14 +7,16 @@ spring:
     import: optional:file:.env[.properties]
   ai:
     mcp:
-      # Serveur MCP « statsfoot » en lecture seule : SSE sur /sse (claude mcp add --transport sse statsfoot http://localhost:8080/sse)
+      # Serveur MCP « statsfoot » en lecture seule : transport STREAMABLE sur /mcp
+      # (claude mcp add --transport http statsfoot http://localhost:8080/mcp)
       server:
         name: statsfoot
         version: 1.0.0
         type: SYNC
+        protocol: STREAMABLE
         instructions: >
           Statistiques du tournoi (dernière compétition importée), en lecture seule. Outils : metrics, rank, find,
-          player_report, team_report. Les chiffres viennent de la base ; les données marquées fictives le sont.
+          player_report, team_report, searchPlayers, comparePlayers. Les chiffres viennent de la base ; les données marquées fictives le sont.
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/analysefoot}
     username: ${DB_USERNAME:analysefoot}
@@ -56,6 +58,12 @@ analyse:
 # Trace des échanges (appli, LLM, tool rank, MCP, SQL) : journalisée (logger analyse.trace) et renvoyée à l'interface.
 # Elle contient la question saisie : mettre ANALYSE_TRACE=false pour ne plus la journaliser.
 analyse.trace.enabled: ${ANALYSE_TRACE:true}
+
+# Trace des appels au LLM et aux tools (SimpleLoggerAdvisor du chat, outils de joueurs)
+logging:
+  level:
+    org.springframework.ai.chat.client.advisor: DEBUG
+    org.springframework.ai.model.tool: DEBUG
 
 management:
   endpoints:

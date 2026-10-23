@@ -1,0 +1,6 @@
+.card { border: 1px solid #d0d5dd; border-radius: 8px; padding: 1rem 1.25rem; background: #fff; }
+h2 { margin: 0 0 0.5rem; }
+h3 { margin: 1rem 0 0.5rem; font-size: 1.05rem; color: #344054; }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; margin: 0; }
+dt { color: #667085; }
+dd { margin: 0; font-weight: 600; }

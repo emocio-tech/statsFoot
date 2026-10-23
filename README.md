@@ -149,7 +149,7 @@ réponse du LLM pour `FREE_TEXT`) et `interpretation.source` (`NAME` ou `ASSISTA
 
 ### Serveur MCP « statsfoot » (lecture seule)
 
-Le backend expose les mêmes fonctions que l'API comme serveur MCP (Spring AI, transport SSE sur `/sse`), pour
+Le backend expose les mêmes fonctions que l'API comme serveur MCP (Spring AI, transport STREAMABLE sur `/mcp`), pour
 interroger les statistiques en langage naturel depuis Claude Code ou Claude Desktop. Aucune écriture : mêmes
 requêtes et mêmes vues que l'API ; les données fictives restent signalées.
 
@@ -162,7 +162,17 @@ requêtes et mêmes vues que l'API ; les données fictives restent signalées.
 | `team_report(teamId)` | rapport complet d'une équipe |
 
 Application démarrée (`http://localhost:8080`), Claude Code lit `.mcp.json` à la racine ; sinon :
-`claude mcp add --transport sse statsfoot http://localhost:8080/sse`.
+`claude mcp add --transport http statsfoot http://localhost:8080/mcp`.
+
+## Recherche et comparaison (issues de `main`)
+
+Fonctions reprises de la branche `main`, désormais branchées sur la base PostgreSQL :
+
+- recherche d'un joueur par son nom (profil et statistiques du tournoi) ;
+- comparaison de deux joueurs et de deux équipes (leader sur chaque statistique, verdict rédigé) ;
+- chat LLM (`/api/chat`) et outils MCP `searchPlayers` / `comparePlayers`, exposés avec le protocole **STREAMABLE**.
+
+L'ancienne base H2 et l'import de `data/donneesStats.json` ne sont plus utilisés : PostgreSQL est la seule source de données.
 
 ## Build et lancement
 

@@ -1,0 +1,15 @@
+<main class="page">
+  <h1>Player profile search</h1>
+
+  <app-player-picker (searchStarted)="onSearchStarted()" (playerSelected)="openProfile($event)" />
+
+  @if (message(); as text) {
+    <p class="message" data-testid="message" role="status">{{ text }}</p>
+  }
+
+  @if (profile(); as current) {
+    <div data-testid="profile">
+      <app-player-profile-card [profile]="current" />
+    </div>
+  }
+</main>

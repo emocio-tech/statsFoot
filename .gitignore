@@ -23,3 +23,6 @@ Thumbs.db
 # Secrets et journaux
 .env*
 *.log
+
+# Base H2 de main (abandonnée au profit de PostgreSQL)
+data/h2/
