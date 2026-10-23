@@ -114,7 +114,7 @@ class PlayerComparisonServiceTest {
 		when(repository.findById(2)).thenReturn(Optional.of(player(2, "Bob", 0, stats())));
 
 		assertThatThrownBy(() -> service.compare(1, 2)).isInstanceOf(ComparisonPlayerNotFoundException.class)
-				.hasMessage("Player A not found.");
+				.hasMessage("Player with id 1 not found.");
 	}
 
 	@Test
@@ -123,7 +123,7 @@ class PlayerComparisonServiceTest {
 		when(repository.findById(2)).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> service.compare(1, 2)).isInstanceOf(ComparisonPlayerNotFoundException.class)
-				.hasMessage("Player B not found.");
+				.hasMessage("Player with id 2 not found.");
 	}
 
 	@Test
@@ -132,7 +132,7 @@ class PlayerComparisonServiceTest {
 		when(repository.findById(2)).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> service.compare(1, 2)).isInstanceOf(ComparisonPlayerNotFoundException.class)
-				.hasMessage("Player A not found.");
+				.hasMessage("Player with id 1 not found.");
 	}
 
 	@Test
@@ -394,10 +394,10 @@ class PlayerComparisonServiceTest {
 
 		assertThatThrownBy(() -> service.compareByName("Nobody", "Alice"))
 				.isInstanceOf(ComparisonPlayerNotFoundException.class)
-				.hasMessage("Player A not found.");
+				.hasMessage("Player \"Nobody\" not found.");
 		assertThatThrownBy(() -> service.compareByName("Alice", "Nobody"))
 				.isInstanceOf(ComparisonPlayerNotFoundException.class)
-				.hasMessage("Player B not found.");
+				.hasMessage("Player \"Nobody\" not found.");
 	}
 
 	@Test
@@ -410,12 +410,12 @@ class PlayerComparisonServiceTest {
 
 		assertThatThrownBy(() -> service.compareByName("p", "Alice"))
 				.isInstanceOf(AmbiguousPlayerNameException.class)
-				.hasMessage("Several players match the name of player A: Player 1 (T1), Player 2 (T2), Player 3 (T3), "
+				.hasMessage("Several players match the name \"p\": Player 1 (T1), Player 2 (T2), Player 3 (T3), "
 						+ "Player 4 (T4), Player 5 (T5), Player 6 (T6), Player 7 (T7), Player 8 (T8), Player 9 (T9), "
 						+ "Player 10 (T10) and 3 more. Please be more precise.");
 		assertThatThrownBy(() -> service.compareByName("Alice", "q"))
 				.isInstanceOf(AmbiguousPlayerNameException.class)
-				.hasMessage("Several players match the name of player B: Player 1 (T1), Player 2 (T2), Player 3 (T3). "
+				.hasMessage("Several players match the name \"q\": Player 1 (T1), Player 2 (T2), Player 3 (T3). "
 						+ "Please be more precise.");
 	}
 
@@ -427,7 +427,7 @@ class PlayerComparisonServiceTest {
 
 		assertThatThrownBy(() -> service.compareByName("p", "Alice"))
 				.isInstanceOf(AmbiguousPlayerNameException.class)
-				.hasMessage("Several players match the name of player A: Player 1 (T1), Player 2 (T2), Player 3 (T3), "
+				.hasMessage("Several players match the name \"p\": Player 1 (T1), Player 2 (T2), Player 3 (T3), "
 						+ "Player 4 (T4), Player 5 (T5), Player 6 (T6), Player 7 (T7), Player 8 (T8), Player 9 (T9), "
 						+ "Player 10 (T10). Please be more precise.");
 	}
@@ -440,7 +440,7 @@ class PlayerComparisonServiceTest {
 
 		assertThatThrownBy(() -> service.compareByName("p", "Alice"))
 				.isInstanceOf(AmbiguousPlayerNameException.class)
-				.hasMessage("Several players match the name of player A: Player 1 (T1), Player 2 (T2), Player 3 (T3), "
+				.hasMessage("Several players match the name \"p\": Player 1 (T1), Player 2 (T2), Player 3 (T3), "
 						+ "Player 4 (T4), Player 5 (T5), Player 6 (T6), Player 7 (T7), Player 8 (T8), Player 9 (T9), "
 						+ "Player 10 (T10) and 1 more. Please be more precise.");
 	}
@@ -491,7 +491,7 @@ class PlayerComparisonServiceTest {
 
 		assertThatThrownBy(() -> service.compareByName("Danilo", "Bob"))
 				.isInstanceOf(AmbiguousPlayerNameException.class)
-				.hasMessage("Several players match the name of player A: Danilo (T1), danilo (T4), "
+				.hasMessage("Several players match the name \"Danilo\": Danilo (T1), danilo (T4), "
 						+ "Danilo Santos (T3). Please be more precise.");
 	}
 
@@ -502,7 +502,7 @@ class PlayerComparisonServiceTest {
 
 		assertThatThrownBy(() -> service.compareByName("Dan", "Bob"))
 				.isInstanceOf(AmbiguousPlayerNameException.class)
-				.hasMessage("Several players match the name of player A: Danilo (T1), Danilo Santos (T3). "
+				.hasMessage("Several players match the name \"Dan\": Danilo (T1), Danilo Santos (T3). "
 						+ "Please be more precise.");
 	}
 
@@ -513,6 +513,6 @@ class PlayerComparisonServiceTest {
 
 		assertThatThrownBy(() -> service.compareByName("Nobody", " "))
 				.isInstanceOf(ComparisonPlayerNotFoundException.class)
-				.hasMessage("Player A not found.");
+				.hasMessage("Player \"Nobody\" not found.");
 	}
 }

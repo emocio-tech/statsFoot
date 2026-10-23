@@ -60,14 +60,14 @@ class PlayerComparisonControllerTest {
 	void compare_unknownA_returns404() throws Exception {
 		mockMvc.perform(get(URL).param("playerA", "999999").param("playerB", "2"))
 				.andExpect(status().isNotFound())
-				.andExpect(content().json("{\"error\":\"Player A not found.\"}", true));
+				.andExpect(content().json("{\"error\":\"Player with id 999999 not found.\"}", true));
 	}
 
 	@Test
 	void compare_unknownB_returns404() throws Exception {
 		mockMvc.perform(get(URL).param("playerA", "1").param("playerB", "999999"))
 				.andExpect(status().isNotFound())
-				.andExpect(content().json("{\"error\":\"Player B not found.\"}", true));
+				.andExpect(content().json("{\"error\":\"Player with id 999999 not found.\"}", true));
 	}
 
 	@Test

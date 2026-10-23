@@ -36,7 +36,7 @@ class PlayerComparisonByNameTest {
 	void unknownName_raisesNotFound() {
 		assertThatThrownBy(() -> comparisonService.compareByName("Raul RANGEL", "zzzz unknown"))
 				.isInstanceOf(ComparisonPlayerNotFoundException.class)
-				.hasMessage("Player B not found.");
+				.hasMessage("Player \"zzzz unknown\" not found.");
 	}
 
 	@Test
@@ -45,7 +45,7 @@ class PlayerComparisonByNameTest {
 				.isInstanceOf(AmbiguousPlayerNameException.class)
 				.satisfies(e -> {
 					String message = e.getMessage();
-					assertThat(message).startsWith("Several players match the name of player A: ");
+					assertThat(message).startsWith("Several players match the name \"a\": ");
 					assertThat(message).containsPattern(" and \\d+ more\\. Please be more precise\\.$");
 					String list = message.substring(message.indexOf(": ") + 2, message.lastIndexOf(" and "));
 					assertThat(list.split("\\), ")).hasSize(10);

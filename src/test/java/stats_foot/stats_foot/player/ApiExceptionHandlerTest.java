@@ -100,19 +100,19 @@ class ApiExceptionHandlerTest {
 	@Test
 	void unknownPlayerAGivesNamedNotFound() throws Exception {
 		when(playerComparisonService.compare(anyInt(), anyInt()))
-				.thenThrow(new ComparisonPlayerNotFoundException("Player A not found."));
+				.thenThrow(new ComparisonPlayerNotFoundException("Player with id 999999 not found."));
 		mockMvc.perform(get("/api/players/compare").param("playerA", "999999").param("playerB", "2"))
 				.andExpect(status().isNotFound())
-				.andExpect(content().json("{\"error\":\"Player A not found.\"}", true));
+				.andExpect(content().json("{\"error\":\"Player with id 999999 not found.\"}", true));
 	}
 
 	@Test
 	void unknownPlayerBGivesNamedNotFound() throws Exception {
 		when(playerComparisonService.compare(anyInt(), anyInt()))
-				.thenThrow(new ComparisonPlayerNotFoundException("Player B not found."));
+				.thenThrow(new ComparisonPlayerNotFoundException("Player with id 999999 not found."));
 		mockMvc.perform(get("/api/players/compare").param("playerA", "1").param("playerB", "999999"))
 				.andExpect(status().isNotFound())
-				.andExpect(content().json("{\"error\":\"Player B not found.\"}", true));
+				.andExpect(content().json("{\"error\":\"Player with id 999999 not found.\"}", true));
 	}
 
 	@Test

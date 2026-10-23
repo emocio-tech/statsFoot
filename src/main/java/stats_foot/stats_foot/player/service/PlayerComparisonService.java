@@ -98,7 +98,7 @@ public class PlayerComparisonService {
 			throw new BlankComparisonNameException("Player " + label + " name must not be blank.");
 		}
 		if (result.total() == 0 || result.players().isEmpty()) {
-			throw new ComparisonPlayerNotFoundException("Player " + label + " not found.");
+			throw new ComparisonPlayerNotFoundException("Player \"" + name + "\" not found.");
 		}
 		if (result.total() > 1) {
 			String normalizedQuery = NameNormalizer.normalize(name);
@@ -108,19 +108,19 @@ public class PlayerComparisonService {
 			if (exact.size() == 1) {
 				return exact.get(0).id();
 			}
-			throw new AmbiguousPlayerNameException(ambiguousMessage(label, result));
+			throw new AmbiguousPlayerNameException(ambiguousMessage(name, result));
 		}
 		return result.players().get(0).id();
 	}
 
-	private static String ambiguousMessage(String label, PlayerSearchResult result) {
+	private static String ambiguousMessage(String name, PlayerSearchResult result) {
 		String candidates = result.players().stream()
 				.limit(MAX_CANDIDATES)
 				.map(p -> p.name() + " (" + p.teamCode() + ")")
 				.collect(Collectors.joining(", "));
 		int remaining = result.total() - MAX_CANDIDATES;
 		String more = remaining > 0 ? " and " + remaining + " more" : "";
-		return "Several players match the name of player " + label + ": " + candidates + more
+		return "Several players match the name \"" + name + "\": " + candidates + more
 				+ ". Please be more precise.";
 	}
 
@@ -131,16 +131,16 @@ public class PlayerComparisonService {
 	 * @param idB the id of the second player
 	 * @return the comparison report
 	 * @throws SamePlayerComparisonException     if both ids are equal
-	 * @throws ComparisonPlayerNotFoundException if a player does not exist (A is named first)
+	 * @throws ComparisonPlayerNotFoundException if a player does not exist (idA is checked first; the message contains the missing id)
 	 */
 	public PlayerComparison compare(int idA, int idB) {
 		if (idA == idB) {
 			throw new SamePlayerComparisonException();
 		}
 		Player playerA = playerRepository.findById(idA)
-				.orElseThrow(() -> new ComparisonPlayerNotFoundException("Player A not found."));
+				.orElseThrow(() -> new ComparisonPlayerNotFoundException("Player with id " + idA + " not found."));
 		Player playerB = playerRepository.findById(idB)
-				.orElseThrow(() -> new ComparisonPlayerNotFoundException("Player B not found."));
+				.orElseThrow(() -> new ComparisonPlayerNotFoundException("Player with id " + idB + " not found."));
 
 		ComparedPlayer comparedA = toComparedPlayer(playerA);
 		ComparedPlayer comparedB = toComparedPlayer(playerB);

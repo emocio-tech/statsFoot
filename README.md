@@ -38,12 +38,16 @@ cd frontend && npm test    # FrontEnd (non interactive)
 | `statsfoot.database-file` | `./data/h2/statsfoot` | H2 database file (without extension). H2 needs an explicit `./` or an absolute path. |
 | `statsfoot.data-file` | `data/donneesStats.json` | Data file imported when the database is empty |
 | `spring.datasource.url` | H2 file URL built from `statsfoot.database-file` | Datasource (tests use an in-memory H2) |
+| `spring.ai.mcp.server.protocol` | `SSE` (framework default) | Must be `STREAMABLE` for the MCP server to answer on `/mcp` (see "MCP server") |
+| `spring.ai.mcp.server.name` / `version` | `mcp-server` / `1.0.0` | Server name and version seen by MCP clients (`statsfoot-mcp` / `1.0.0` here) |
+
+The `spring.ai.mcp.server.*` properties are set in both `src/main/resources/application.properties` and `src/test/resources/application.properties`: the test file replaces the main one on the classpath, so the tests would not see the MCP configuration otherwise.
 
 ## API
 
 - `GET /api/players?name=<text>` — search by name (case, accents and extra spaces ignored, partial match). Returns `{ total, truncated, players[] }` with `id`, `name`, `teamCode`, `teamName`; at most 50 players sorted by name. `400` if the name is blank or missing.
 - `GET /api/players/{id}` — profile: name, team, goalkeeper and captain match counts and the tournament totals (`stats`: matches, minutes, goals, cards, fouls, free kicks, duels, corners, offsides, distance, man of the match, ratings). A statistic without value is `null`. `404` if the id is unknown or not a number.
-- `GET /api/players/compare?playerA=<id>&playerB=<id>` — comparison report of two different players. Returns `playerA` / `playerB` (`id`, `name`, `teamName`, `teamCode`, `role`: `GOALKEEPER` if the player played at least one match as goalkeeper, else `OUTFIELD_PLAYER`), `lines[]` (one per statistic: `key`, `label`, `valueA`, `valueB`, `difference` = A − B, `leader`: `A`, `B`, `TIE` or `null`, `available`), `summary` (`leadsA`, `leadsB`, `ties`), `roleWarning` (`null` when both roles are the same) and `verdict` (deterministic English text). `400` if the two ids are equal, missing or not integers; `404` with `Player A not found.` / `Player B not found.` for an unknown id.
+- `GET /api/players/compare?playerA=<id>&playerB=<id>` — comparison report of two different players. Returns `playerA` / `playerB` (`id`, `name`, `teamName`, `teamCode`, `role`: `GOALKEEPER` if the player played at least one match as goalkeeper, else `OUTFIELD_PLAYER`), `lines[]` (one per statistic: `key`, `label`, `valueA`, `valueB`, `difference` = A − B, `leader`: `A`, `B`, `TIE` or `null`, `available`), `summary` (`leadsA`, `leadsB`, `ties`), `roleWarning` (`null` when both roles are the same) and `verdict` (deterministic English text). `400` if the two ids are equal, missing or not integers; `404` with `Player with id <id> not found.` for an unknown id (A is checked before B).
 - `503` with `{ "error": "Player data is currently unavailable." }` when the database cannot be read or the import failed.
 
 ### Player comparison
@@ -59,8 +63,26 @@ Rules of the report (`PlayerComparisonService`):
 `PlayerComparisonService` is a plain Spring bean without any HTTP dependency, so it can be called directly from Java code (for instance by an LLM tool that does not know player ids):
 
 - `compare(int idA, int idB)` throws `SamePlayerComparisonException`, `ComparisonPlayerNotFoundException` and `PlayerDataUnavailableException`.
-- `compareByName(String nameA, String nameB)` resolves each name (A first, then B) with the same search as `GET /api/players?name=` (case, accents and extra spaces ignored, partial match), then behaves like `compare`. It additionally throws `BlankComparisonNameException` (blank name), `ComparisonPlayerNotFoundException` (`Player A not found.` / `Player B not found.`) and `AmbiguousPlayerNameException` when a name matches several players and none or several of them have a name exactly equal to the given one (exact match first: if exactly one does, case, accents and extra spaces ignored, that player is used, e.g. `danilo` gives `DANILO` even though `DANILO SANTOS` also matches; message listing at most 10 candidates with their team, then `and N more` if any). There is no HTTP endpoint by names.
+- `compareByName(String nameA, String nameB)` resolves each name (A first, then B) with the same search as `GET /api/players?name=` (case, accents and extra spaces ignored, partial match), then behaves like `compare`. It additionally throws `BlankComparisonNameException` (blank name), `ComparisonPlayerNotFoundException` (`Player "<typed name>" not found.`) and `AmbiguousPlayerNameException` when a name matches several players and none or several of them have a name exactly equal to the given one (exact match first: if exactly one does, case, accents and extra spaces ignored, that player is used, e.g. `danilo` gives `DANILO` even though `DANILO SANTOS` also matches; message `Several players match the name "<typed name>": ...` listing at most 10 candidates with their team, then `and N more` if any). There is no HTTP endpoint by names.
 
 The FrontEnd page `/compare` (menu "Compare") has two text fields and a single "Compare" button (Enter also submits). On "Compare" each name is resolved with the search endpoint: a blank field shows "Please enter a player name.", an unknown name shows "Player not found.", and a name matching several players lists them under the field (click one, then press "Compare" again), unless exactly one of them has a name equal to the typed text (case, accents and extra spaces ignored): that player is then used directly. Only the first 50 results of the search are examined for the exact match. Once both players are identified the page shows both identities, the role warning, the summary, the verdict and one row per statistic with a bar on the side of the leading player (bar width = relative gap). Editing a field clears its chosen player, its candidates, its error and the report. Comparing a player with themselves shows the API error.
 
-The specifications, plans and tasks are in `specs/` (`player-profile-search`, amended by `player-h2-database`; `player-comparison`).
+## MCP server
+
+The application is also a Model Context Protocol (MCP) server, so that an external MCP client (Claude Desktop, Claude Code, an IDE assistant...) can use the player comparison. It is independent of the chat assistant, whose own tools (`PlayerTools`) are unchanged and not exposed through MCP.
+
+- **Endpoint**: `http://localhost:8080/mcp`, Streamable HTTP, framework default path. The endpoint is open (no authentication): training use only.
+- **Tool**: exactly one, `comparePlayers`, with two mandatory text inputs `playerA` and `playerB` (full or partial name, case and accents ignored). It returns the same JSON as the chat's `comparePlayers` tool (`PlayerComparison`: `playerA`, `playerB`, `lines`, `summary`, `roleWarning`, `verdict`).
+- **Errors**: returned as a tool result with `isError = true` and a text message. The messages come from `PlayerComparisonService` and name the typed player: `Player "<typed name>" not found.`, `Several players match the name "<typed name>": ... Please be more precise.`, `Player A name must not be blank.`, `The two players must be different.` (for two unknown players, only the first one is reported). For an unknown player the MCP tool adds `Try again with a fuller or corrected full name.`; the chat tool adds instead the advice to call `searchPlayers`, a tool MCP clients do not have.
+- **Connection example** (Claude Code): `claude mcp add --transport http statsfoot http://localhost:8080/mcp`.
+
+How it works (package `stats_foot.stats_foot.mcp`):
+
+- `McpPlayerTools` is a plain class (not a Spring bean) with one `@Tool` method that delegates to `PlayerComparisonService.compareByName`. On `ComparisonPlayerNotFoundException` it rethrows the service message (`Player "<typed name>" not found.`) followed by the advice to retry with a fuller or corrected name.
+- `McpServerConfig` registers a single `ToolCallbackProvider` containing only that object. The Spring AI MCP server exposes every `ToolCallbackProvider` of the context, so `PlayerTools` must never be registered as one, or the other chat tools would leak to MCP clients.
+
+Tests: `McpPlayerToolsTest` (unit), `McpServerIntegrationTest` (providers registered, no duplicated tool in the chat) and `McpServerEndToEndTest` (real MCP client on a random port: initialize, tool list and schema, nominal calls compared with the internal service, error cases).
+
+Known limits: only the comparison is exposed (no search, no query, no team comparison); the endpoint is not protected.
+
+The specifications, plans and tasks are in `specs/` (`player-profile-search`, amended by `player-h2-database`; `player-comparison`; `mcp-player-comparison`).
